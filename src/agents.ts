@@ -22,6 +22,7 @@ async function readVmInstructions(
 	}
 	if (additionalInstructions) parts.push(additionalInstructions);
 	if (toolReference) parts.push(toolReference);
+	if (parts.length === 0) return "";
 	// Append a horizontal rule so agents can distinguish the injected
 	// system prompt from whatever the host appends after it.
 	parts.push("---");
