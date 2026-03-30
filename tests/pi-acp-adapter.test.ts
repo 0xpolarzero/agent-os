@@ -142,7 +142,7 @@ describe("pi-acp adapter manual spawn", () => {
 		expect(agentInfo.name).toBeDefined();
 	}, 60_000);
 
-	test("session/new sends request and receives JSON-RPC response", async () => {
+	test("session/new returns a real PI session id", async () => {
 		const spawned = spawnPiAcp();
 		client = spawned.client;
 
@@ -174,14 +174,12 @@ describe("pi-acp adapter manual spawn", () => {
 			);
 		}
 
-		// Verify we got a well-formed JSON-RPC response
+		expect(sessionResponse.error).toBeUndefined();
 		expect(sessionResponse.id).toBeDefined();
 		expect(sessionResponse.jsonrpc).toBe("2.0");
-		// session/new may succeed (returning a result) or fail with an error
-		// depending on whether pi-acp can resolve the PI CLI binary
+		expect(sessionResponse.result).toBeDefined();
 		expect(
-			sessionResponse.result !== undefined ||
-				sessionResponse.error !== undefined,
-		).toBe(true);
+			(sessionResponse.result as { sessionId?: string }).sessionId,
+		).toBeTruthy();
 	}, 60_000);
 });
