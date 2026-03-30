@@ -20,9 +20,9 @@ import {
  *   3. Emits session/update notifications for tool execution and final text
  *
  * Uses fetch() which is available in the VM via the kernel network stack.
- * Falls back to mock ACP adapter approach because createSession('pi') cannot
- * spawn the PI agent binary inside the VM (bare command PATH resolution is
- * unsupported in the kernel).
+ * This test still uses a mock ACP adapter because it needs deterministic
+ * tool_use and tool_result behavior that would be awkward to guarantee with
+ * the real PI agent.
  */
 const MOCK_LLM_AGENT_ADAPTER = `
 const BASE_URL = process.env.ANTHROPIC_BASE_URL;

@@ -88,6 +88,9 @@ export class S3BlockStore implements FsBlockStore {
 		offset: number,
 		length: number,
 	): Promise<Uint8Array> {
+		if (length === 0) {
+			return new Uint8Array(0);
+		}
 		try {
 			const resp = await this.client.send(
 				new GetObjectCommand({

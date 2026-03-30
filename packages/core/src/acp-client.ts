@@ -24,6 +24,8 @@ export class AcpClient {
 	private _notificationHandlers: NotificationHandler[] = [];
 	private _closed = false;
 	private _timeoutMs: number;
+	private _stdoutIterator: AsyncIterator<string> | null = null;
+	private _readerClosed = false;
 
 	constructor(
 		process: ManagedProcess,
@@ -72,14 +74,21 @@ export class AcpClient {
 	close(): void {
 		if (this._closed) return;
 		this._closed = true;
+		this._closeReader();
 		this._rejectAll(new Error("AcpClient closed"));
 		this._process.kill();
 	}
 
 	private _startReading(stdoutLines: AsyncIterable<string>): void {
 		void (async () => {
+			const iterator = stdoutLines[Symbol.asyncIterator]();
+			this._stdoutIterator = iterator;
 			try {
-				for await (const line of stdoutLines) {
+				while (!this._closed) {
+					const { value: line, done } = await iterator.next();
+					if (done) {
+						break;
+					}
 					if (this._closed) break;
 					const trimmed = line.trim();
 					if (!trimmed) continue;
@@ -102,6 +111,10 @@ export class AcpClient {
 				}
 			} catch {
 				// Stream ended or errored
+			} finally {
+				if (this._stdoutIterator === iterator) {
+					this._stdoutIterator = null;
+				}
 			}
 		})();
 	}
@@ -109,6 +122,7 @@ export class AcpClient {
 	private _watchExit(): void {
 		this._process.wait().then(() => {
 			this._closed = true;
+			this._closeReader();
 			this._rejectAll(new Error("Agent process exited"));
 		});
 	}
@@ -118,6 +132,18 @@ export class AcpClient {
 			clearTimeout(pending.timer);
 			pending.reject(error);
 			this._pending.delete(id);
+		}
+	}
+
+	private _closeReader(): void {
+		if (this._readerClosed) {
+			return;
+		}
+		this._readerClosed = true;
+		const iterator = this._stdoutIterator;
+		this._stdoutIterator = null;
+		if (iterator && typeof iterator.return === "function") {
+			void iterator.return();
 		}
 	}
 }

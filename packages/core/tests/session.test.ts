@@ -178,12 +178,10 @@ describe("full createSession API", () => {
 		await vm.dispose();
 	});
 
-	test("createSession('pi') spawns pi-acp and returns Session", async () => {
-		// createSession resolves pi-acp bin from host node_modules,
-		// spawns it inside the VM, sends initialize and session/new.
-		// session/new fails because pi-acp internally tries to spawn the bare
-		// `pi` command which can't be resolved inside the VM (no PATH lookup).
-		// We verify the lifecycle runs through initialize and handles session/new error.
+	test("createSession('pi') starts PI and completes a prompt turn", async () => {
+		let sessionId: string | undefined;
+		const events: JsonRpcNotification[] = [];
+
 		try {
 			const session = await vm.createSession("pi", {
 				env: {
@@ -191,16 +189,29 @@ describe("full createSession API", () => {
 					ANTHROPIC_BASE_URL: mockUrl,
 				},
 			});
-			// If we get here, createSession succeeded end-to-end
-			expect(session).toBeDefined();
-			expect(session.sessionId).toBeDefined();
-			vm.closeSession(session.sessionId);
-		} catch (err) {
-			// Expected: session/new fails because pi-acp can't spawn PI in the VM
-			const message = (err as Error).message;
-			expect(message).toContain("session/new failed");
+			sessionId = session.sessionId;
+			vm.onSessionEvent(sessionId, (event) => {
+				events.push(event);
+			});
+
+			const response = await vm.prompt(
+				sessionId,
+				"Reply with exactly the word hello.",
+			);
+
+			expect(response.error).toBeUndefined();
+			expect(response.result).toBeDefined();
+			expect(
+				(response.result as { stopReason?: string }).stopReason,
+			).toBe("end_turn");
+			expect(events.length).toBeGreaterThanOrEqual(1);
+			expect(events[0].method).toBe("session/update");
+		} finally {
+			if (sessionId) {
+				vm.closeSession(sessionId);
+			}
 		}
-	}, 60_000);
+	}, 90_000);
 
 	test("session.prompt() sends prompt and receives session/update events", async () => {
 		const { sessionId } = await createMockSession(vm);
