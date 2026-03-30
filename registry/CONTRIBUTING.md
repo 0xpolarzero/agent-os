@@ -6,7 +6,7 @@ Thank you for your interest in contributing to the agentOS Registry.
 
 This registry is for **software that runs inside agentOS VMs**: WASM command binaries and JavaScript agent/tool packages.
 
-**Non-software packages** like filesystem drivers (S3, Google Drive), sandbox providers, and other host-side integrations live in the main repo at [`rivet-dev/rivet/agent-os/`](https://github.com/rivet-dev/rivet/tree/main/agent-os/packages).
+**Non-software packages** like filesystem drivers (S3, Google Drive), sandbox providers, and other host-side integrations live in the main repo at [`rivet-dev/agent-os`](https://github.com/rivet-dev/agent-os).
 
 ## License
 
