@@ -5,10 +5,14 @@
 	"license": "Apache-2.0",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
+	"bin": {
+		"pi-sdk-acp": "./dist/adapter.js"
+	},
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
-			"import": "./dist/index.js"
+			"import": "./dist/index.js",
+			"default": "./dist/index.js"
 		}
 	},
 	"scripts": {
@@ -17,8 +21,9 @@
 	},
 	"dependencies": {
 		"@rivet-dev/agent-os-core": "link:../../../packages/core",
+		"@agentclientprotocol/sdk": "^0.16.1",
 		"@mariozechner/pi-coding-agent": "^0.60.0",
-		"pi-acp": "^0.0.23"
+		"@mariozechner/pi-ai": "^0.60.0"
 	},
 	"devDependencies": {
 		"@types/node": "^22.10.2",

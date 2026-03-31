@@ -9,17 +9,11 @@ const pi = defineSoftware({
 	name: "pi",
 	type: "agent" as const,
 	packageDir,
-	requires: ["pi-acp", "@mariozechner/pi-coding-agent"],
+	requires: ["@mariozechner/pi-coding-agent"],
 	agent: {
 		id: "pi",
-		acpAdapter: "pi-acp",
+		acpAdapter: "@rivet-dev/agent-os-pi",
 		agentPackage: "@mariozechner/pi-coding-agent",
-		env: (ctx) => ({
-			PI_ACP_PI_COMMAND: ctx.resolveBin(
-				"@mariozechner/pi-coding-agent",
-				"pi",
-			),
-		}),
 		prepareInstructions: async (kernel, _cwd, additionalInstructions, opts) => {
 			const parts: string[] = [];
 			if (!opts?.skipBase) {
