@@ -1,5 +1,26 @@
-import { readFileSync, realpathSync } from "node:fs";
+import { readFileSync, realpathSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
+
+/**
+ * Resolve a package directory by walking up the directory tree.
+ * Supports both nested (pnpm) and flat (npm) node_modules layouts.
+ */
+function resolvePackageDir(startDir: string, packageName: string): string {
+	let searchDir = startDir;
+	while (true) {
+		const candidate = join(searchDir, "node_modules", packageName);
+		if (existsSync(join(candidate, "package.json"))) {
+			return realpathSync(candidate);
+		}
+		const parent = dirname(searchDir);
+		if (parent === searchDir) break;
+		searchDir = parent;
+	}
+	throw new Error(
+		`Package "${packageName}" not found starting from ${startDir}. ` +
+			`Ensure it is installed.`,
+	);
+}
 import type { Kernel } from "@secure-exec/core";
 import type { AgentConfig, PrepareInstructionsOptions } from "./agents.js";
 
@@ -126,23 +147,10 @@ function createSoftwareContext(
 	>();
 
 	for (const reqPkg of requires) {
-		const hostPkgJsonPath = join(
-			packageDir,
-			"node_modules",
-			reqPkg,
-			"package.json",
-		);
-		try {
-			const pkg = JSON.parse(readFileSync(hostPkgJsonPath, "utf-8"));
-			const hostDir = dirname(hostPkgJsonPath);
-			const vmDir = `/root/node_modules/${reqPkg}`;
-			resolvedPackages.set(reqPkg, { hostDir, vmDir, pkg });
-		} catch {
-			throw new Error(
-				`Package "${reqPkg}" not found at ${hostPkgJsonPath}. ` +
-					`Ensure it is listed as a dependency of the package at ${packageDir}.`,
-			);
-		}
+		const hostDir = resolvePackageDir(packageDir, reqPkg);
+		const pkg = JSON.parse(readFileSync(join(hostDir, "package.json"), "utf-8"));
+		const vmDir = `/root/node_modules/${reqPkg}`;
+		resolvedPackages.set(reqPkg, { hostDir, vmDir, pkg });
 	}
 
 	return {
@@ -248,14 +256,10 @@ export function processSoftware(
 
 			case "agent": {
 				// Collect module roots for all required npm packages.
-				// Resolve symlinks so pnpm's linked node_modules work correctly.
+				// Walks up directory tree to support flat (npm) and nested (pnpm) layouts.
 				const ctx = createSoftwareContext(pkg.packageDir, pkg.requires);
 				for (const reqPkg of pkg.requires) {
-					const hostDir = realpathSync(join(
-						pkg.packageDir,
-						"node_modules",
-						reqPkg,
-					));
+					const hostDir = resolvePackageDir(pkg.packageDir, reqPkg);
 					const vmDir = `/root/node_modules/${reqPkg}`;
 					softwareRoots.push({ hostPath: hostDir, vmPath: vmDir });
 				}
@@ -279,13 +283,9 @@ export function processSoftware(
 
 			case "tool": {
 				// Collect module roots for all required npm packages.
-				// Resolve symlinks so pnpm's linked node_modules work correctly.
+				// Walks up directory tree to support flat (npm) and nested (pnpm) layouts.
 				for (const reqPkg of pkg.requires) {
-					const hostDir = realpathSync(join(
-						pkg.packageDir,
-						"node_modules",
-						reqPkg,
-					));
+					const hostDir = resolvePackageDir(pkg.packageDir, reqPkg);
 					const vmDir = `/root/node_modules/${reqPkg}`;
 					softwareRoots.push({ hostPath: hostDir, vmPath: vmDir });
 				}
