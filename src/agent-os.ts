@@ -82,8 +82,8 @@ import {
 	createNodeHostNetworkAdapter,
 	createNodeRuntime,
 } from "@secure-exec/nodejs";
-import { createPythonRuntime } from "@secure-exec/python";
-import { createWasmVmRuntime } from "@secure-exec/wasmvm";
+import { createPythonRuntime } from "@rivet-dev/agent-os-python";
+import { createWasmVmRuntime } from "@rivet-dev/agent-os-posix";
 import { AcpClient } from "./acp-client.js";
 import { AGENT_CONFIGS, type AgentConfig, type AgentType } from "./agents.js";
 import {

@@ -33,9 +33,9 @@
 	"dependencies": {
 		"@secure-exec/core": "link:../../../secure-exec-1/packages/core",
 		"@secure-exec/nodejs": "link:../../../secure-exec-1/packages/nodejs",
-		"@secure-exec/python": "link:../../../secure-exec-1/packages/python",
+		"@rivet-dev/agent-os-python": "workspace:*",
 		"@secure-exec/v8": "link:../../../secure-exec-1/packages/v8",
-		"@secure-exec/wasmvm": "link:../../../secure-exec-1/packages/wasmvm",
+		"@rivet-dev/agent-os-posix": "workspace:*",
 		"croner": "^10.0.1",
 		"long-timeout": "^0.1.1",
 		"secure-exec": "link:../../../secure-exec-1/packages/secure-exec"
