@@ -1,6 +1,6 @@
 {
   "name": "@rivet-dev/agent-os-common",
-  "version": "0.0.260330091313",
+  "version": "0.0.260331072558",
   "type": "module",
   "license": "Apache-2.0",
   "description": "Common WASM command set for agentOS (coreutils + sed + grep + gawk + findutils + diffutils + tar + gzip)",
