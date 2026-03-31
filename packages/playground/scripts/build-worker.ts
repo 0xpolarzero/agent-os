@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 
 const playgroundDir = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const workerSourcePath = resolve(playgroundDir, "../secure-exec/src/browser/worker.ts");
+const workerSourcePath = resolve(playgroundDir, "../browser/src/worker.ts");
 const workerSourceDir = dirname(workerSourcePath);
 const workerOutputPath = resolve(playgroundDir, "secure-exec-worker.js");
 const appSourcePath = resolve(playgroundDir, "frontend/app.ts");

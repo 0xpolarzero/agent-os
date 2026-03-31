@@ -23,7 +23,7 @@
 	},
 	"dependencies": {
 		"googleapis": "^144.0.0",
-		"@secure-exec/core": "link:../../../../secure-exec-1/packages/core"
+		"@secure-exec/core": "^0.2.1"
 	},
 	"devDependencies": {
 		"@types/node": "^22.10.2",

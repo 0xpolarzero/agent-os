@@ -14,12 +14,12 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "@secure-exec/core": "link:../../secure-exec-1/packages/core",
-    "@secure-exec/nodejs": "link:../../secure-exec-1/packages/nodejs",
+    "@secure-exec/core": "^0.2.1",
+    "@secure-exec/nodejs": "^0.2.1",
     "@rivet-dev/agent-os-python": "link:../packages/python",
     "@rivet-dev/agent-os-posix": "link:../packages/posix",
     "@types/node": "^22.10.2",
-    "secure-exec": "link:../../secure-exec-1/packages/secure-exec",
+    "secure-exec": "^0.2.1",
     "typescript": "^5.9.2",
     "vitest": "^2.1.8"
   }

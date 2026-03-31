@@ -11,8 +11,8 @@
     "check-types": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@secure-exec/core": "link:../../../secure-exec-1/packages/core",
-    "@secure-exec/nodejs": "link:../../../secure-exec-1/packages/nodejs",
+    "@secure-exec/core": "^0.2.1",
+    "@secure-exec/nodejs": "^0.2.1",
     "@rivet-dev/agent-os-posix": "workspace:*"
   },
   "devDependencies": {

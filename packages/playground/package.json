@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@rivet-dev/agent-os-browser": "workspace:*",
-    "secure-exec": "link:../../../secure-exec-1/packages/secure-exec"
+    "secure-exec": "^0.2.1"
   },
   "devDependencies": {
     "esbuild": "^0.27.1",

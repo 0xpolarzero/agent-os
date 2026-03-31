@@ -43,12 +43,25 @@ All published packages follow `@rivet-dev/agent-os-{apt-name}` where `{apt-name}
 | git | @rivet-dev/agent-os-git | git (planned) |
 | make | @rivet-dev/agent-os-make | make (planned) |
 
+### Disabled packages (WASM binaries not built)
+
+The following packages exist but **cannot be compiled** until a patched wasi-libc sysroot is built (`make sysroot` in `native/c/`). The vanilla wasi-sdk sysroot lacks `<netdb.h>` and other POSIX networking headers these programs need. The `make publish` and `copy-wasm` targets automatically skip packages with empty `wasm/` directories.
+
+| Package | Reason |
+|---|---|
+| @rivet-dev/agent-os-curl | Needs `<netdb.h>` (patched wasi-libc) |
+| @rivet-dev/agent-os-wget | Needs `<netdb.h>` (patched wasi-libc) |
+| @rivet-dev/agent-os-sqlite3 | Needs patched wasi-libc |
+| @rivet-dev/agent-os-git | WASM binary not yet built |
+
+To unblock: run `cd native && ./scripts/patch-wasi-libc.sh` to build the patched sysroot, then `cd .. && make build-wasm-c copy-wasm`.
+
 ### Meta-packages
 
 | Package | Includes |
 |---|---|
 | @rivet-dev/agent-os-common | coreutils + sed + grep + gawk + findutils + diffutils + tar + gzip |
-| @rivet-dev/agent-os-build-essential | common + make + git + curl |
+| @rivet-dev/agent-os-build-essential | common + make + git |
 
 ### Permission Tiers
 

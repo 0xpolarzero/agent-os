@@ -12,8 +12,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@secure-exec/core": "link:../../../secure-exec-1/packages/core",
-    "@secure-exec/nodejs": "link:../../../secure-exec-1/packages/nodejs",
+    "@secure-exec/core": "^0.2.1",
+    "@secure-exec/nodejs": "^0.2.1",
     "@rivet-dev/agent-os-python": "workspace:*",
     "@rivet-dev/agent-os-posix": "workspace:*",
     "pino": "^10.3.1",

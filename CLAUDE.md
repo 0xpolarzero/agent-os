@@ -29,12 +29,30 @@ agentOS wraps the kernel and adds: a high-level filesystem/process API, ACP agen
 - **Monorepo**: pnpm workspaces + Turborepo + TypeScript + Biome (mirrors secure-exec)
 - **Core package**: `@rivet-dev/agent-os-core` in `packages/core/` -- contains everything (VM ops, ACP client, session management)
 - **Registry types**: `@rivet-dev/agent-os-registry-types` in `packages/registry-types/` -- shared type definitions for WASM command package descriptors. The registry software packages link to this package. When changing descriptor types, update here and rebuild the registry.
-- **S3 block store**: `@rivet-dev/agent-os-s3` in `registry/file-system/s3/` -- S3-compatible `FsBlockStore` for cloud-persistent VFS storage. Pluggable driver, not imported by core.
 - **npm scope**: `@rivet-dev/agent-os-*`
 - **Actor integration** lives in the Rivet repo at `rivetkit-typescript/packages/rivetkit/src/agent-os/`, not as a separate package
 - **The actor layer must maintain 1:1 feature parity with AgentOs.** Every public method on the `AgentOs` class (`packages/core/src/agent-os.ts`) must have a corresponding actor action in the Rivet repo's `rivetkit-typescript/packages/rivetkit/src/agent-os/`. Subscription methods (onProcessStdout, onShellData, onCronEvent, etc.) are wired through actor events. Lifecycle methods (dispose) are handled by the actor's onSleep/onDestroy hooks. When adding a new public method to AgentOs, add the corresponding actor action in the same change.
 - **The RivetKit driver test suite must have full feature coverage of all agent-os actor actions.** Tests live in the Rivet repo's `rivetkit-typescript/packages/rivetkit/src/driver-test-suite/tests/`. When adding a new actor action, add a corresponding driver test in the same change.
 - **The core quickstart (`examples/quickstart/`) and the RivetKit example (in the Rivet repo at `examples/agent-os/`) must stay in sync.** Both cover the same set of features (hello-world, filesystem, processes, network, cron, tools, agent-session, sandbox) with identical behavior, just different APIs. Core uses `AgentOs.create()` directly; RivetKit uses `agentOs()` actor with client-server split. When adding or changing a quickstart example, update both.
+
+## Registry
+
+The `registry/` directory contains four categories of extension packages, all published under `@rivet-dev/agent-os-*`:
+
+1. **Agents** (`registry/agent/`) — ACP adapter packages that let specific coding agents run inside the VM. Each agent package wraps an agent SDK or CLI with an ACP adapter binary. Examples: `@rivet-dev/agent-os-pi`, `@rivet-dev/agent-os-pi-cli`, `@rivet-dev/agent-os-opencode`.
+2. **File systems** (`registry/file-system/`) — Pluggable `FsBlockStore` implementations for persistent VFS storage. These are drivers passed via `type: "custom"` mount, not imported by core. Examples: `@rivet-dev/agent-os-s3` (S3-compatible block store), `@rivet-dev/agent-os-google-drive` (Google Drive API v3).
+3. **Tools** (`registry/tool/`) — Extension toolkits that add capabilities to the VM. Example: `@rivet-dev/agent-os-sandbox` (Sandbox Agent SDK integration with `createSandboxFs()` and `createSandboxToolkit()`).
+4. **Software** (`registry/software/`) — Pre-built WASM command binaries (coreutils, grep, sed, etc.) compiled from Rust and C source in `registry/native/`. See `registry/CLAUDE.md` for naming conventions, package types, and how to add new packages.
+
+### Release and publishing
+
+**The main release script (`scripts/release.ts`) only handles the core TypeScript packages** (`packages/core/`, `packages/registry-types/`, etc.). It bumps the version in `packages/core/package.json`, commits, tags, and triggers the `release.yml` CI workflow which builds and publishes via `npm publish`.
+
+**Registry packages (agents, file-systems, tools) are normal TypeScript packages** that follow the same semver versioning as core. They are currently published manually but share the same release cadence.
+
+**Software packages are on a separate track.** They require a native build step (Rust nightly + wasi-sdk for C) to compile WASM binaries before they can be published. They use date-based versioning (`0.0.YYMMDDHHmmss`) instead of semver and are published via `make publish` from `registry/`. The software publish pipeline skips unchanged packages via content hashing. Software packages have no dependency on the core release cycle.
+
+The registry software packages depend on `@rivet-dev/agent-os-registry-types` (in `packages/registry-types/`) via workspace link. This is the single source of truth for descriptor types like `WasmCommandPackage` and `WasmMetaPackage`.
 
 ## Terminology
 
@@ -59,9 +77,7 @@ agentOS wraps the kernel and adds: a high-level filesystem/process API, ACP agen
 ### Agent-OS filesystem packages
 
 - The old `fs-sqlite` and `fs-postgres` packages were deleted. They are replaced by the secure-exec `SqliteMetadataStore` and the `ChunkedVFS` composition layer.
-- **`registry/file-system/s3/`** (`@rivet-dev/agent-os-s3`): Exports `S3BlockStore` implementing the secure-exec `FsBlockStore` interface. Used with `ChunkedVFS(SqliteMetadataStore + S3BlockStore)` for cloud-persistent storage. Pluggable driver passed via `type: "custom"` mount, not imported by core.
-- **`registry/file-system/google-drive/`** (`@rivet-dev/agent-os-google-drive`): Preview. Exports `GoogleDriveBlockStore` implementing the secure-exec `FsBlockStore` interface. Uses Google Drive API v3 via service account credentials. Tests are gated behind `GOOGLE_DRIVE_CLIENT_EMAIL`, `GOOGLE_DRIVE_PRIVATE_KEY`, and `GOOGLE_DRIVE_FOLDER_ID` environment variables.
-- **`registry/tool/sandbox/`** (`@rivet-dev/agent-os-sandbox`): Sandbox extension. Contains both `createSandboxFs()` (VirtualFileSystem backed by Sandbox Agent SDK) and `createSandboxToolkit()`. The old `fs-sandbox` package was merged into this.
+- File system drivers live in `registry/file-system/` (see Registry section above). They implement the `FsBlockStore` interface and are passed via `type: "custom"` mount.
 - The Rivet actor integration (in the Rivet repo at `rivetkit-typescript/packages/rivetkit/src/agent-os/`) uses `ChunkedVFS(InMemoryMetadataStore + InMemoryBlockStore)` as a temporary in-memory solution. A persistent backend (actor KV-backed metadata + actor storage-backed blocks) is planned.
 
 ## Filesystem Conventions
@@ -72,11 +88,8 @@ agentOS wraps the kernel and adds: a high-level filesystem/process API, ACP agen
 
 ## Dependencies
 
-- **secure-exec** is a `link:` dependency pointing to `~/secure-exec-1` (relative paths from each package)
+- **secure-exec** is published on npm as `secure-exec`, `@secure-exec/core`, `@secure-exec/nodejs`, `@secure-exec/v8`, etc. Pinned at `^0.2.1`.
 - **Rivet repo** — A modifiable copy lives at `~/r-aos`. Use this when you need to make changes to the Rivet codebase.
-- We can modify secure-exec as needed to fix issues or add missing APIs
-- **Prefer implementing in secure-exec** when a feature is fundamentally an OS-level concern (filesystem, process management, networking). agentOS should be a thin wrapper, not a reimplementation. If adding something to secure-exec simplifies the agentOS implementation, do it there.
-- **Fix root causes in secure-exec, not workarounds in agentOS.** If something is broken at the kernel/runtime level (PATH resolution, networking, process spawning), fix it in secure-exec. Don't add patchwork in agentOS to compensate for VM bugs. The only code in agentOS should be the high-level API surface and ACP session management.
 - Mount host `node_modules` read-only for agent packages (pi-acp, etc.)
 
 ## Agent Sessions (ACP)
@@ -136,12 +149,6 @@ Each agent type needs:
 - **Keep docs in `~/r-aos/docs/docs/agent-os/` up to date** when public API methods or types are added, removed, or changed on AgentOs or Session classes.
 - **Keep `website/src/data/registry.ts` up to date.** When adding, removing, or renaming a package, update this file so the website reflects the current set of available apps (agents, file-systems, software, and sandbox providers). Every new agent-os package or registry software package must have a corresponding entry.
 - **No implementation details in user-facing docs.** Never mention WebAssembly, WASM, V8 isolates, Pyodide, or SQLite VFS in documentation outside of `architecture.mdx`. These are internal implementation details. Use user-facing language instead: "persistent filesystem" not "SQLite VFS", "JavaScript, TypeScript, Python, and shell commands" not "WASM, V8 isolates, and Pyodide", "sandboxed execution" not "WebAssembly and V8 isolates". The `architecture.mdx` page is the only place where internals are appropriate.
-
-## Software Registry
-
-All WASM command source code and software packages live in `registry/`. Software packages are in `registry/software/` (not `packages/`). This includes the Rust and C source, build system, and npm package wrappers. Each package corresponds to a Debian/apt package name and publishes as `@rivet-dev/agent-os-{name}`. See `registry/CLAUDE.md` for naming conventions, package types, and how to add new packages. No WASM command code remains in secure-exec.
-
-The registry software packages depend on `@rivet-dev/agent-os-registry-types` (in `packages/registry-types/`) via workspace link. This is the single source of truth for descriptor types like `WasmCommandPackage` and `WasmMetaPackage`.
 
 ## Agent Working Directory
 

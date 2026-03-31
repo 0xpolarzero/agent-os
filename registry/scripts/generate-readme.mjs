@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * Generates README.md from per-package metadata files.
- * Run: node scripts/generate-readme.mjs
+ * Generates the package table in the root README.md from per-package metadata files.
+ * Run: node registry/scripts/generate-readme.mjs
  */
 
 import { readdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
@@ -10,8 +10,9 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(__dirname, "..");
-const PACKAGES_DIR = join(ROOT, "software");
+const REGISTRY_ROOT = join(__dirname, "..");
+const REPO_ROOT = join(REGISTRY_ROOT, "..");
+const PACKAGES_DIR = join(REGISTRY_ROOT, "software");
 
 function loadPackages() {
 	const dirs = readdirSync(PACKAGES_DIR, { withFileTypes: true })
@@ -77,97 +78,24 @@ function generateTable(packages) {
 	return table;
 }
 
-function generateReadme(packages) {
-	const table = generateTable(packages);
+function injectTable(readmePath, table) {
+	const readme = readFileSync(readmePath, "utf8");
+	const beginMarker = "<!-- BEGIN PACKAGE TABLE -->";
+	const endMarker = "<!-- END PACKAGE TABLE -->";
 
-	return `# agentOS Registry
+	const beginIdx = readme.indexOf(beginMarker);
+	const endIdx = readme.indexOf(endMarker);
+	if (beginIdx === -1 || endIdx === -1) {
+		throw new Error(`Missing package table markers in ${readmePath}`);
+	}
 
-Software packages for [agentOS](https://github.com/rivet-dev/rivet) that run inside VMs. This includes WASM command binaries and JavaScript agent/tool packages.
-
-Non-software packages (filesystem drivers like S3, Google Drive, and sandbox providers) live in the main repo at [\`rivet-dev/rivet/agent-os/\`](https://github.com/rivet-dev/rivet/tree/main/agent-os/packages).
-
-## Installation
-
-Install individual packages:
-
-\`\`\`bash
-npm install @rivet-dev/agent-os-coreutils @rivet-dev/agent-os-grep
-\`\`\`
-
-Or use a meta-package for a complete set:
-
-\`\`\`bash
-npm install @rivet-dev/agent-os-common
-\`\`\`
-
-## Usage
-
-Each package exports a descriptor with command metadata and a \`commandDir\` path pointing to the WASM binaries:
-
-\`\`\`typescript
-import coreutils from "@rivet-dev/agent-os-coreutils";
-import grep from "@rivet-dev/agent-os-grep";
-
-const vm = await AgentOs.create({
-  packages: [coreutils, grep],
-});
-\`\`\`
-
-## Package Types
-
-### WASM Packages
-
-Pre-built WebAssembly binaries that register as executable commands in the VM. Each WASM package provides one or more commands (e.g., \`coreutils\` provides \`sh\`, \`cat\`, \`ls\`, etc.). Commands are compiled from Rust and C to WASM and distributed as npm packages.
-
-### JavaScript Packages
-
-Node.js agent and tool packages that are projected into the VM via the ModuleAccessFileSystem overlay. These include coding agents (like PI) and CLI tools that run as Node.js scripts inside the VM.
-
-## Packages
-
-<!-- BEGIN PACKAGE TABLE -->
-${table}<!-- END PACKAGE TABLE -->
-
-## Building
-
-All WASM command source code lives in \`native/\`. Requires a Rust nightly toolchain (auto-installed via \`rust-toolchain.toml\`).
-
-\`\`\`bash
-# Build everything (WASM binaries + TypeScript packages)
-make build
-
-# Or step by step:
-make build-wasm    # Compile Rust + C commands to WASM
-make copy-wasm     # Copy binaries into per-package wasm/ directories
-make build         # Build TypeScript (includes above steps)
-\`\`\`
-
-## Publishing
-
-All packages use date-based versioning (\`0.0.{YYMMDDHHmmss}\`). Publishing skips unchanged packages via content hashing.
-
-\`\`\`bash
-# Dry run
-make publish-dry
-
-# Publish changed packages
-make publish
-
-# Force publish all
-make publish-force
-\`\`\`
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for how to add new packages.
-
-## License
-
-Apache-2.0
-`;
+	const before = readme.slice(0, beginIdx + beginMarker.length);
+	const after = readme.slice(endIdx);
+	writeFileSync(readmePath, `${before}\n${table}${after}`);
 }
 
 const packages = loadPackages();
-const readme = generateReadme(packages);
-writeFileSync(join(ROOT, "README.md"), readme);
-console.log(`Generated README.md with ${packages.length} packages`);
+const table = generateTable(packages);
+const readmePath = join(REPO_ROOT, "README.md");
+injectTable(readmePath, table);
+console.log(`Injected ${packages.length} packages into ${readmePath}`);
