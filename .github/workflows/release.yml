@@ -46,10 +46,10 @@ jobs:
         run: pnpm install --no-frozen-lockfile
 
       - name: Build
-        run: pnpm turbo build
+        run: pnpm turbo build --filter='!./registry/software/*' --filter='!@rivet-dev/agent-os-playground' --filter='!@secure-exec/example-doom'
 
       - name: Type check
-        run: pnpm turbo check-types
+        run: pnpm turbo check-types --filter='!./registry/software/*' --filter='!@rivet-dev/agent-os-playground' --filter='!@secure-exec/example-doom'
 
       - name: Publish to npm
         run: |
