@@ -112,8 +112,9 @@ describe("pi-sdk-acp adapter manual spawn", () => {
 		return { proc: spawned, client: acpClient, stderr: () => stderrOutput };
 	}
 
-	async function initializePiSdkSession() {
-		const spawned = spawnPiSdkAcp();
+	async function initializeAndCreateSession(
+		spawned: ReturnType<typeof spawnPiSdkAcp>,
+	): Promise<Awaited<ReturnType<AcpClient["request"]>>> {
 		client = spawned.client;
 
 		const initResponse = await client.request("initialize", {
@@ -127,9 +128,19 @@ describe("pi-sdk-acp adapter manual spawn", () => {
 			mcpServers: [],
 		});
 		expect(sessionResponse.error).toBeUndefined();
+		return sessionResponse;
+	}
 
+	async function initializePiSdkSession() {
+		const spawned = spawnPiSdkAcp();
+		const sessionResponse = await initializeAndCreateSession(spawned);
 		const sessionResult = sessionResponse.result as {
 			sessionId: string;
+			configOptions?: Array<Record<string, unknown>>;
+			modes?: {
+				currentModeId: string;
+				availableModes: Array<{ id: string; name: string }>;
+			};
 			models?: {
 				currentModelId: string;
 				availableModels: Array<{
@@ -142,7 +153,6 @@ describe("pi-sdk-acp adapter manual spawn", () => {
 
 		return {
 			spawned,
-			initResponse,
 			sessionResponse,
 			sessionResult,
 			sessionId: sessionResult.sessionId,
@@ -275,4 +285,225 @@ describe("pi-sdk-acp adapter manual spawn", () => {
 		expect(invalidModelResponse.error).toBeDefined();
 		expect(invalidModelResponse.error?.message).toContain("Unknown model");
 	}, 90_000);
-});
+
+	test("session/new advertises session-scoped config/model state", async () => {
+		const { sessionResult } = await initializePiSdkSession();
+
+		const sessionId = sessionResult.sessionId;
+		expect(typeof sessionId).toBe("string");
+		expect(sessionId).toBeTruthy();
+
+		const configOptions = sessionResult.configOptions as Array<
+			Record<string, unknown>
+		>;
+		expect(Array.isArray(configOptions)).toBe(true);
+
+		const modes = sessionResult.modes as
+			| {
+					currentModeId: string;
+					availableModes: Array<{ id: string; name: string }>;
+			  }
+			| undefined;
+		expect(modes).toBeDefined();
+		expect(modes?.currentModeId).toBeTruthy();
+		expect(modes?.availableModes.length ?? 0).toBeGreaterThan(0);
+
+		const modelOption = configOptions.find((option) => option.id === "model");
+		expect(modelOption).toBeDefined();
+		expect(modelOption?.category).toBe("model");
+		expect(modelOption?.name).toBe("Model");
+
+		const thoughtOption = configOptions.find(
+			(option) => option.id === "thought_level",
+		);
+		expect(thoughtOption).toBeDefined();
+		expect(thoughtOption?.category).toBe("thought_level");
+		expect(thoughtOption?.name).toBe("Thinking Level");
+
+		const models = sessionResult.models as
+			| {
+					currentModelId: string;
+					availableModels: Array<{ modelId: string; name: string }>;
+			  }
+			| undefined;
+		expect(models).toBeDefined();
+		expect(models?.currentModelId).toBeTruthy();
+		expect(models?.availableModels.length ?? 0).toBeGreaterThan(0);
+		expect(
+			models?.availableModels.some(
+				(model) => model.modelId === models.currentModelId,
+			),
+		).toBe(true);
+
+		expect(modelOption?.currentValue).toBe(models?.currentModelId);
+		const modelChoices = modelOption?.options as
+			| Array<{ value: string; name: string }>
+			| undefined;
+		expect(modelChoices?.length ?? 0).toBeGreaterThan(0);
+		expect(
+			modelChoices?.some((option) => option.value === models?.currentModelId),
+		).toBe(true);
+	}, 90_000);
+
+	test("session/set_mode remains compatible with thinking-level mutation", async () => {
+		const { spawned, sessionId, sessionResult } =
+			await initializePiSdkSession();
+		const notifications: Array<{ method: string; params: unknown }> = [];
+		client.onNotification((notification) => {
+			notifications.push(notification);
+		});
+
+		const modes = sessionResult.modes as {
+			currentModeId: string;
+			availableModes: Array<{ id: string; name: string }>;
+		};
+		const nextModeId = modes.availableModes.find(
+			(mode) => mode.id !== modes.currentModeId,
+		)?.id;
+		expect(
+			nextModeId,
+			"expected at least two thinking-level modes for compatibility coverage",
+		).toBeTruthy();
+
+		const modeResponse = await client.request("session/set_mode", {
+			sessionId,
+			modeId: nextModeId,
+		});
+		expect(
+			modeResponse.error,
+			`session/set_mode failed. stderr: ${spawned.stderr()}`,
+		).toBeUndefined();
+		expect(modeResponse.result).toEqual({});
+
+		const modeUpdate = notifications
+			.filter((notification) => notification.method === "session/update")
+			.map(
+				(notification) =>
+					(notification.params as {
+						update?: { sessionUpdate?: string; currentModeId?: string };
+					}).update,
+			)
+			.find((update) => update?.sessionUpdate === "current_mode_update");
+		expect(modeUpdate?.currentModeId).toBe(nextModeId);
+	}, 90_000);
+
+	test("session config and model mutation update PI session state", async () => {
+		const { spawned, sessionId, sessionResult } =
+			await initializePiSdkSession();
+		const notifications: Array<{ method: string; params: unknown }> = [];
+		client.onNotification((notification) => {
+			notifications.push(notification);
+		});
+
+		const configOptions = sessionResult.configOptions as Array<
+			Record<string, unknown>
+		>;
+		const thoughtOption = configOptions.find(
+			(option) => option.id === "thought_level",
+		);
+		expect(thoughtOption).toBeDefined();
+		const thoughtChoices = (thoughtOption?.options as Array<{
+			value: string;
+			name: string;
+		}>) ?? [{ value: String(thoughtOption?.currentValue ?? "off"), name: "off" }];
+		const currentThought = String(thoughtOption?.currentValue ?? "off");
+		const nextThought =
+			thoughtChoices.find((choice) => choice.value !== currentThought)?.value ??
+			currentThought;
+
+		const thoughtResponse = await client.request("session/set_config_option", {
+			sessionId,
+			configId: "thought_level",
+			value: nextThought,
+		});
+		expect(
+			thoughtResponse.error,
+			`thought mutation failed. stderr: ${spawned.stderr()}`,
+		).toBeUndefined();
+		const thoughtResult = thoughtResponse.result as {
+			configOptions: Array<Record<string, unknown>>;
+		};
+		const updatedThought = thoughtResult.configOptions.find(
+			(option) => option.id === "thought_level",
+		);
+		expect(updatedThought?.currentValue).toBe(nextThought);
+
+		const models = sessionResult.models as {
+			currentModelId: string;
+			availableModels: Array<{ modelId: string; name: string }>;
+		};
+		const nextModelId = models.availableModels.find(
+			(model) => model.modelId !== models.currentModelId,
+		)?.modelId;
+		expect(
+			nextModelId,
+			"expected at least two selectable PI models for mutation coverage",
+		).toBeTruthy();
+
+		const modelResponse = await client.request("session/set_config_option", {
+			sessionId,
+			configId: "model",
+			value: nextModelId,
+		});
+		expect(
+			modelResponse.error,
+			`model mutation failed. stderr: ${spawned.stderr()}`,
+		).toBeUndefined();
+		const modelResult = modelResponse.result as {
+			configOptions: Array<Record<string, unknown>>;
+		};
+		const updatedModel = modelResult.configOptions.find(
+			(option) => option.id === "model",
+		);
+		expect(updatedModel?.currentValue).toBe(nextModelId);
+
+		const restoreResponse = await client.request("session/set_model", {
+			sessionId,
+			modelId: models.currentModelId,
+		});
+		expect(
+			restoreResponse.error,
+			`session/set_model failed. stderr: ${spawned.stderr()}`,
+		).toBeUndefined();
+		expect(restoreResponse.result).toEqual({});
+
+		const configUpdates = notifications
+			.filter((notification) => notification.method === "session/update")
+			.map(
+				(notification) =>
+					(notification.params as {
+						update?: { sessionUpdate?: string; configOptions?: unknown };
+					}).update,
+			)
+			.filter(
+				(update): update is {
+					sessionUpdate: string;
+					configOptions: unknown;
+				} =>
+					update?.sessionUpdate === "config_option_update" &&
+					update.configOptions !== undefined,
+			);
+		expect(configUpdates.length).toBeGreaterThanOrEqual(2);
+
+		const currentModeUpdates = notifications
+			.filter((notification) => notification.method === "session/update")
+			.map(
+				(notification) =>
+					(notification.params as {
+						update?: { sessionUpdate?: string; currentModeId?: string };
+					}).update,
+			)
+			.filter(
+				(update): update is {
+					sessionUpdate: string;
+					currentModeId?: string;
+				} => update?.sessionUpdate === "current_mode_update",
+			);
+		expect(currentModeUpdates.length).toBeGreaterThanOrEqual(3);
+		expect(
+			currentModeUpdates.some(
+				(update) => update.currentModeId === nextThought,
+			),
+		).toBe(true);
+		}, 90_000);
+	});
