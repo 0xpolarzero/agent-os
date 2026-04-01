@@ -5,6 +5,15 @@
 	"engines": {
 		"node": ">=20"
 	},
+	"workspaces": [
+		"registry",
+		"packages/*",
+		"examples/*",
+		"registry/software/*",
+		"registry/agent/*",
+		"registry/file-system/*",
+		"registry/tool/*"
+	],
 	"scripts": {
 		"start": "npx turbo watch build",
 		"build": "npx turbo build",

@@ -9,6 +9,7 @@ Make the `agent-os` monorepo consumable as a vendored workspace in Bun-based app
 The desired outcome is simple:
 
 - internal monorepo package references use `workspace:*`
+- the monorepo root declares its workspace layout in `package.json`
 - Bun can install the vendored workspace graph cleanly
 - pnpm workspace behavior still works
 
@@ -33,6 +34,7 @@ Do not add consumer-side patch scripts or runtime workarounds if the source meta
 2. Implementation subagent
 - Update only internal monorepo package metadata.
 - Replace internal relative `link:` references with `workspace:*`.
+- Add root `package.json` workspace metadata when Bun needs it to discover the vendored graph.
 - Avoid runtime code changes.
 - Keep the package graph semantically identical.
 
@@ -64,6 +66,7 @@ Do not change runtime logic unless a packaging-level dead end makes it strictly 
 ## Technical Requirements
 
 - Replace internal monorepo `link:` package specs with `workspace:*`.
+- Declare the monorepo workspace globs in root `package.json`.
 - Do not change external non-workspace dependencies.
 - Do not introduce consumer-specific path rewrites.
 - Preserve pnpm monorepo semantics.
