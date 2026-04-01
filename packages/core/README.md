@@ -124,7 +124,8 @@ await vm.dispose();
 | `respondPermission` | `respondPermission(permissionId: string, reply: PermissionReply): Promise<JsonRpcResponse>` | Reply to a permission request |
 | `setMode` | `setMode(modeId: string): Promise<JsonRpcResponse>` | Set the session mode (e.g., "plan") |
 | `getModes` | `getModes(): SessionModeState \| null` | Get available modes |
-| `setModel` | `setModel(model: string): Promise<JsonRpcResponse>` | Set the model |
+| `setModel` | `setModel(model: string): Promise<JsonRpcResponse>` | Set the model by ACP model ID |
+| `getModelState` | `getModelState(): SessionModelState \| null` | Get the current model and available model IDs |
 | `setThoughtLevel` | `setThoughtLevel(level: string): Promise<JsonRpcResponse>` | Set reasoning level |
 | `getConfigOptions` | `getConfigOptions(): SessionConfigOption[]` | Get available config options |
 | `getEvents` | `getEvents(options?: GetEventsOptions): JsonRpcNotification[]` | Get event history |
@@ -171,9 +172,11 @@ await vm.dispose();
 
 **Session**
 - `SessionInfo` — Session summary (sessionId, agentType)
-- `SessionInitData` — Data from ACP initialize response
+- `SessionInitData` — Session metadata hydrated from ACP initialize and session/new
 - `SessionMode` — A mode the agent supports
 - `SessionModeState` — Current mode and available modes
+- `SessionModel` — A model the agent supports
+- `SessionModelState` — Current model and available model IDs
 - `SessionConfigOption` — A configuration option the agent supports
 - `AgentCapabilities` — Boolean capability flags from the agent
 - `AgentInfo` — Agent identity (name, version)

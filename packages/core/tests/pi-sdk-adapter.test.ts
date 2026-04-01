@@ -112,6 +112,43 @@ describe("pi-sdk-acp adapter manual spawn", () => {
 		return { proc: spawned, client: acpClient, stderr: () => stderrOutput };
 	}
 
+	async function initializePiSdkSession() {
+		const spawned = spawnPiSdkAcp();
+		client = spawned.client;
+
+		const initResponse = await client.request("initialize", {
+			protocolVersion: 1,
+			clientCapabilities: {},
+		});
+		expect(initResponse.error).toBeUndefined();
+
+		const sessionResponse = await client.request("session/new", {
+			cwd: "/home/user",
+			mcpServers: [],
+		});
+		expect(sessionResponse.error).toBeUndefined();
+
+		const sessionResult = sessionResponse.result as {
+			sessionId: string;
+			models?: {
+				currentModelId: string;
+				availableModels: Array<{
+					modelId: string;
+					name: string;
+					description?: string;
+				}>;
+			};
+		};
+
+		return {
+			spawned,
+			initResponse,
+			sessionResponse,
+			sessionResult,
+			sessionId: sessionResult.sessionId,
+		};
+	}
+
 	test("initialize returns protocolVersion and agentInfo", async () => {
 		const spawned = spawnPiSdkAcp();
 		client = spawned.client;
@@ -143,66 +180,16 @@ describe("pi-sdk-acp adapter manual spawn", () => {
 	}, 60_000);
 
 	test("session/new creates session via Pi SDK", async () => {
-		const spawned = spawnPiSdkAcp();
-		client = spawned.client;
+		const { sessionResponse, sessionId } = await initializePiSdkSession();
 
-		// Must initialize first
-		let initResponse: Awaited<ReturnType<AcpClient["request"]>>;
-		try {
-			initResponse = await client.request("initialize", {
-				protocolVersion: 1,
-				clientCapabilities: {},
-			});
-		} catch (err) {
-			throw new Error(
-				`Initialize failed. stderr: ${spawned.stderr()}\n${err}`,
-			);
-		}
-		expect(initResponse.error).toBeUndefined();
-
-		// Send session/new. The SDK adapter creates a session in-process
-		// via createAgentSession() — no subprocess spawning.
-		let sessionResponse: Awaited<ReturnType<AcpClient["request"]>>;
-		try {
-			sessionResponse = await client.request("session/new", {
-				cwd: "/home/user",
-				mcpServers: [],
-			});
-		} catch (err) {
-			throw new Error(
-				`session/new failed. stderr: ${spawned.stderr()}\n${err}`,
-			);
-		}
-
-		expect(sessionResponse.error).toBeUndefined();
 		expect(sessionResponse.id).toBeDefined();
 		expect(sessionResponse.jsonrpc).toBe("2.0");
 		expect(sessionResponse.result).toBeDefined();
-		expect(
-			(sessionResponse.result as { sessionId?: string }).sessionId,
-		).toBeTruthy();
+		expect(sessionId).toBeTruthy();
 	}, 90_000);
 
 	test("session/prompt streams events and completes", async () => {
-		const spawned = spawnPiSdkAcp();
-		client = spawned.client;
-
-		// Initialize
-		const initResponse = await client.request("initialize", {
-			protocolVersion: 1,
-			clientCapabilities: {},
-		});
-		expect(initResponse.error).toBeUndefined();
-
-		// Create session
-		const sessionResponse = await client.request("session/new", {
-			cwd: "/home/user",
-			mcpServers: [],
-		});
-		expect(sessionResponse.error).toBeUndefined();
-		const sessionId = (
-			sessionResponse.result as { sessionId: string }
-		).sessionId;
+		const { spawned, sessionId } = await initializePiSdkSession();
 
 		// Collect all notifications
 		const notifications: Array<{ method: string; params: unknown }> = [];
@@ -240,5 +227,52 @@ describe("pi-sdk-acp adapter manual spawn", () => {
 		for (const n of notifications) {
 			expect(n.method).toBe("session/update");
 		}
+	}, 90_000);
+
+	test("session/new returns model state for the real PI adapter", async () => {
+		const { sessionResult } = await initializePiSdkSession();
+
+		expect(sessionResult.models).toBeDefined();
+		expect(sessionResult.models?.currentModelId).toBeTruthy();
+		expect(sessionResult.models?.availableModels.length).toBeGreaterThan(0);
+		expect(
+			sessionResult.models?.availableModels.some(
+				(model) => model.modelId === sessionResult.models?.currentModelId,
+			),
+		).toBe(true);
+	}, 90_000);
+
+	test("session/set_model accepts advertised model IDs and rejects invalid ones", async () => {
+		const { sessionId, sessionResult } = await initializePiSdkSession();
+
+		expect(sessionResult.models).toBeDefined();
+		const models = sessionResult.models!;
+		const targetModel =
+			models.availableModels.find(
+				(model) => model.modelId !== models.currentModelId,
+			) ?? models.availableModels[0];
+
+		const setModelResponse = await client.request("session/set_model", {
+			sessionId,
+			modelId: targetModel.modelId,
+		});
+		expect(setModelResponse.error).toBeUndefined();
+		expect(setModelResponse.result).toEqual({});
+
+		const promptResponse = await client.request("session/prompt", {
+			sessionId,
+			prompt: [{ type: "text", text: "Say hello" }],
+		});
+		expect(promptResponse.error).toBeUndefined();
+		expect(
+			(promptResponse.result as { stopReason: string }).stopReason,
+		).toBe("end_turn");
+
+		const invalidModelResponse = await client.request("session/set_model", {
+			sessionId,
+			modelId: "definitely-not-a-real-model",
+		});
+		expect(invalidModelResponse.error).toBeDefined();
+		expect(invalidModelResponse.error?.message).toContain("Unknown model");
 	}, 90_000);
 });
