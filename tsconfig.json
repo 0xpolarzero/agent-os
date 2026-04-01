@@ -1,8 +1,14 @@
 {
-	"extends": "../../tsconfig.base.json",
 	"compilerOptions": {
+		"target": "ESNext",
 		"module": "NodeNext",
 		"moduleResolution": "NodeNext",
+		"strict": true,
+		"skipLibCheck": true,
+		"allowSyntheticDefaultImports": true,
+		"downlevelIteration": true,
+		"lib": ["ESNext"],
+		"types": ["node"],
 		"esModuleInterop": true,
 		"declaration": true,
 		"outDir": "./dist",
