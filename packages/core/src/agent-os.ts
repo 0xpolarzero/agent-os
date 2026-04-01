@@ -917,22 +917,22 @@ export class AgentOs {
 			);
 		}
 
-		const sessionId = (sessionResponse.result as { sessionId: string })
-			.sessionId;
+		const sessionResult = sessionResponse.result as
+			| Record<string, unknown>
+			| undefined;
+		const sessionId = sessionResult?.sessionId;
+		if (typeof sessionId !== "string") {
+			client.close();
+			throw new Error("ACP session/new failed: missing sessionId");
+		}
 
-		// Extract capabilities, agentInfo, modes, and config options from initialize response
+		// Hydrate agent-scoped metadata from initialize and session-scoped
+		// metadata from session/new.
 		const initResult = initResponse.result as
 			| Record<string, unknown>
 			| undefined;
 		const initData: SessionInitData = {};
 		if (initResult) {
-			if (initResult.modes) {
-				initData.modes = initResult.modes as SessionInitData["modes"];
-			}
-			if (initResult.configOptions) {
-				initData.configOptions =
-					initResult.configOptions as SessionInitData["configOptions"];
-			}
 			if (initResult.agentCapabilities) {
 				initData.capabilities =
 					initResult.agentCapabilities as SessionInitData["capabilities"];
@@ -940,6 +940,15 @@ export class AgentOs {
 			if (initResult.agentInfo) {
 				initData.agentInfo =
 					initResult.agentInfo as SessionInitData["agentInfo"];
+			}
+		}
+		if (sessionResult) {
+			if (sessionResult.modes) {
+				initData.modes = sessionResult.modes as SessionInitData["modes"];
+			}
+			if (sessionResult.configOptions) {
+				initData.configOptions =
+					sessionResult.configOptions as SessionInitData["configOptions"];
 			}
 		}
 
