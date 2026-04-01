@@ -20,17 +20,16 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "@rivet-dev/agent-os-coreutils": "workspace:*",
-    "@rivet-dev/agent-os-sed": "workspace:*",
-    "@rivet-dev/agent-os-grep": "workspace:*",
-    "@rivet-dev/agent-os-gawk": "workspace:*",
-    "@rivet-dev/agent-os-findutils": "workspace:*",
-    "@rivet-dev/agent-os-diffutils": "workspace:*",
-    "@rivet-dev/agent-os-tar": "workspace:*",
-    "@rivet-dev/agent-os-gzip": "workspace:*"
+    "@rivet-dev/agent-os-coreutils": "0.0.260331072558",
+    "@rivet-dev/agent-os-sed": "0.0.260331072558",
+    "@rivet-dev/agent-os-grep": "0.0.260331072558",
+    "@rivet-dev/agent-os-gawk": "0.0.260331072558",
+    "@rivet-dev/agent-os-findutils": "0.0.260331072558",
+    "@rivet-dev/agent-os-diffutils": "0.0.260331072558",
+    "@rivet-dev/agent-os-tar": "0.0.260331072558",
+    "@rivet-dev/agent-os-gzip": "0.0.260331072558"
   },
   "devDependencies": {
-    "@rivet-dev/agent-os-registry-types": "link:../../../packages/registry-types",
     "@types/node": "^22.10.2",
     "typescript": "^5.9.2"
   }
