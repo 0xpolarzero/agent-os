@@ -16,8 +16,8 @@
   "devDependencies": {
     "@secure-exec/core": "^0.2.1",
     "@secure-exec/nodejs": "^0.2.1",
-    "@rivet-dev/agent-os-python": "link:../packages/python",
-    "@rivet-dev/agent-os-posix": "link:../packages/posix",
+    "@rivet-dev/agent-os-python": "workspace:*",
+    "@rivet-dev/agent-os-posix": "workspace:*",
     "@types/node": "^22.10.2",
     "secure-exec": "^0.2.1",
     "typescript": "^5.9.2",
