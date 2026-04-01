@@ -33,6 +33,14 @@ registry/native/c/libs/
 registry/native/c/.cache/
 registry/native/c/sysroot/
 registry/software/*/wasm/
+!registry/software/coreutils/wasm/
+!registry/software/sed/wasm/
+!registry/software/grep/wasm/
+!registry/software/gawk/wasm/
+!registry/software/findutils/wasm/
+!registry/software/diffutils/wasm/
+!registry/software/tar/wasm/
+!registry/software/gzip/wasm/
 registry/software/*/agent-os-package.meta.json
 registry/.last-publish-hash
 registry/software/*/.last-publish-hash
