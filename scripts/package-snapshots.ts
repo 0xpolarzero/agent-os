@@ -1,11 +1,12 @@
 #!/usr/bin/env npx tsx
 
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, isAbsolute, join, relative, resolve } from "node:path";
 
 const ROOT = join(import.meta.dirname, "..");
+const REGISTRY_COPY_MARKER = join(ROOT, "registry", ".build-markers", "wasm-copied");
 const DEP_FIELDS = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"] as const;
 const RUNTIME_DEP_FIELDS = ["dependencies", "peerDependencies", "optionalDependencies"] as const;
 const COPY_EXCLUDES = new Set(["node_modules", ".turbo", "coverage"]);
@@ -37,6 +38,7 @@ type Options = {
 	manifestPath?: string;
 	push: boolean;
 	build: boolean;
+	allowSkippingUnavailable: boolean;
 };
 
 function run(
@@ -150,9 +152,6 @@ function parseArgs(): Options {
 		}
 	}
 
-	if (packageSelections.length === 0) {
-		fatal("Provide at least one --package or a --packages list");
-	}
 	if (!repo) {
 		fatal("--repo is required");
 	}
@@ -168,6 +167,9 @@ function parseArgs(): Options {
 		manifestPath,
 		push,
 		build,
+		allowSkippingUnavailable:
+			packageSelections.length === 0 ||
+			(packageSelections.length === 1 && packageSelections[0]?.trim().toLowerCase() === "all"),
 	};
 }
 
@@ -197,6 +199,16 @@ function dependencyNamesForFields(
 	}
 
 	return [...names];
+}
+
+function filesFieldEntries(packageJsonPath: string): string[] {
+	const packageJson = readPackageJson(packageJsonPath);
+	const files = packageJson.files;
+	if (!Array.isArray(files)) {
+		return [];
+	}
+
+	return files.filter((entry): entry is string => typeof entry === "string");
 }
 
 function loadWorkspacePackages(): WorkspacePackage[] {
@@ -242,10 +254,21 @@ function resolveSelectionToken(token: string, workspacePackages: WorkspacePackag
 }
 
 function resolveSelectedPackages(tokens: string[], workspacePackages: WorkspacePackage[]): WorkspacePackage[] {
+	const normalizedTokens = tokens.map((token) => token.trim()).filter(Boolean);
+	const allTokenCount = normalizedTokens.filter((token) => token.toLowerCase() === "all").length;
+	if (allTokenCount > 0 && normalizedTokens.length > 1) {
+		fatal('Use "all" by itself, not mixed with other package selections');
+	}
+	if (normalizedTokens.length === 0 || allTokenCount === 1) {
+		return workspacePackages
+			.filter((entry) => !entry.private)
+			.sort((left, right) => left.name.localeCompare(right.name));
+	}
+
 	const selected: WorkspacePackage[] = [];
 	const seen = new Set<string>();
 
-	for (const token of tokens) {
+	for (const token of normalizedTokens) {
 		const resolvedPackage = resolveSelectionToken(token, workspacePackages);
 		if (resolvedPackage.private) {
 			fatal(`Package "${resolvedPackage.name}" is private and cannot be snapshotted`);
@@ -257,6 +280,99 @@ function resolveSelectedPackages(tokens: string[], workspacePackages: WorkspaceP
 	}
 
 	return selected;
+}
+
+function isRegistrySoftwarePackage(workspacePackage: WorkspacePackage): boolean {
+	return relative(join(ROOT, "registry", "software"), workspacePackage.path).startsWith("..") === false;
+}
+
+function packageNeedsWasmAssets(workspacePackage: WorkspacePackage): boolean {
+	return isRegistrySoftwarePackage(workspacePackage) && filesFieldEntries(workspacePackage.packageJsonPath).includes("wasm");
+}
+
+function ensureRegistryWasmAssets(selectedPackages: WorkspacePackage[]) {
+	if (!selectedPackages.some(packageNeedsWasmAssets)) {
+		return;
+	}
+	if (existsSync(REGISTRY_COPY_MARKER)) {
+		return;
+	}
+
+	run("make", ["copy-wasm"], {
+		cwd: join(ROOT, "registry"),
+		stdio: "inherit",
+	});
+}
+
+function missingRequiredFileEntries(packageDir: string): string[] {
+	const packageJsonPath = join(packageDir, "package.json");
+	return filesFieldEntries(packageJsonPath).filter((entry) => !hasPackagedEntry(packageDir, entry));
+}
+
+function partitionSnapshotReadyPackages(selectedPackages: WorkspacePackage[]) {
+	const ready: WorkspacePackage[] = [];
+	const skipped: Array<{ workspacePackage: WorkspacePackage; reason: string }> = [];
+
+	for (const workspacePackage of selectedPackages) {
+		const missingEntries = missingRequiredFileEntries(workspacePackage.path);
+		if (missingEntries.length === 0) {
+			ready.push(workspacePackage);
+			continue;
+		}
+
+		skipped.push({
+			workspacePackage,
+			reason: `required file entries are missing: ${missingEntries.join(", ")}`,
+		});
+	}
+
+	return { ready, skipped };
+}
+
+function partitionPackagesWithAvailableRuntimeDeps(
+	selectedPackages: WorkspacePackage[],
+	initiallySkipped: Array<{ workspacePackage: WorkspacePackage; reason: string }>,
+	workspaceByName: Map<string, WorkspacePackage>,
+) {
+	const skippedByName = new Map(initiallySkipped.map((entry) => [entry.workspacePackage.name, entry.reason]));
+	let ready = selectedPackages;
+	let changed = false;
+
+	do {
+		changed = false;
+		const nextReady: WorkspacePackage[] = [];
+
+		for (const workspacePackage of ready) {
+			const unavailableDependencies = dependencyNamesForFields(
+				workspacePackage.packageJsonPath,
+				workspaceByName,
+				RUNTIME_DEP_FIELDS,
+			).filter((dependencyName) => skippedByName.has(dependencyName));
+
+			if (unavailableDependencies.length === 0) {
+				nextReady.push(workspacePackage);
+				continue;
+			}
+
+			skippedByName.set(
+				workspacePackage.name,
+				`runtime workspace dependencies are unavailable: ${unavailableDependencies.join(", ")}`,
+			);
+			changed = true;
+		}
+
+		ready = nextReady;
+	} while (changed);
+
+	return {
+		ready,
+		skipped: selectedPackages
+			.filter((workspacePackage) => skippedByName.has(workspacePackage.name))
+			.map((workspacePackage) => ({
+				workspacePackage,
+				reason: skippedByName.get(workspacePackage.name) ?? "unavailable",
+			})),
+	};
 }
 
 function shortPackageName(name: string): string {
@@ -343,6 +459,8 @@ function buildSelectedPackages(
 	selectedPackages: WorkspacePackage[],
 	workspaceByName: Map<string, WorkspacePackage>,
 ) {
+	ensureRegistryWasmAssets(selectedPackages);
+
 	const orderedBuilds: string[] = [];
 	const visiting = new Set<string>();
 	const visited = new Set<string>();
@@ -445,19 +563,38 @@ function rewritePackageJson(
 
 function validateFilesField(snapshotDir: string) {
 	const manifest = readPackageJson(join(snapshotDir, "package.json"));
-	const files = manifest.files;
-	if (!Array.isArray(files)) {
-		return;
+	for (const entry of missingRequiredFileEntries(snapshotDir)) {
+		fatal(`Snapshot for "${manifest.name}" is missing required file entry "${entry}"`);
 	}
+}
 
-	for (const entry of files) {
-		if (typeof entry !== "string") {
+function directoryHasPackagedContent(directoryPath: string): boolean {
+	for (const entry of readdirSync(directoryPath, { withFileTypes: true })) {
+		const entryPath = join(directoryPath, entry.name);
+		if (entry.isDirectory()) {
+			if (directoryHasPackagedContent(entryPath)) {
+				return true;
+			}
 			continue;
 		}
-		if (!existsSync(join(snapshotDir, entry))) {
-			fatal(`Snapshot for "${manifest.name}" is missing required file entry "${entry}"`);
-		}
+
+		return true;
 	}
+
+	return false;
+}
+
+function hasPackagedEntry(packageDir: string, entry: string): boolean {
+	const entryPath = join(packageDir, entry);
+	if (!existsSync(entryPath)) {
+		return false;
+	}
+
+	if (!statSync(entryPath).isDirectory()) {
+		return true;
+	}
+
+	return directoryHasPackagedContent(entryPath);
 }
 
 function commitAndTagSnapshot(snapshotDir: string, tag: string, packageName: string, remoteUrl: string) {
@@ -485,7 +622,33 @@ function main() {
 	const options = parseArgs();
 	const workspacePackages = loadWorkspacePackages();
 	const workspaceByName = new Map(workspacePackages.map((entry) => [entry.name, entry]));
-	const selectedPackages = resolveSelectedPackages(options.packages, workspacePackages);
+	let selectedPackages = resolveSelectedPackages(options.packages, workspacePackages);
+
+	if (options.build) {
+		buildSelectedPackages(selectedPackages, workspaceByName);
+	}
+
+	const availability = partitionSnapshotReadyPackages(selectedPackages);
+	const dependencyAvailability = partitionPackagesWithAvailableRuntimeDeps(
+		availability.ready,
+		availability.skipped,
+		workspaceByName,
+	);
+	const skipped = [...availability.skipped, ...dependencyAvailability.skipped];
+	if (skipped.length > 0 && !options.allowSkippingUnavailable) {
+		const firstSkipped = skipped[0];
+		fatal(`Snapshot for "${firstSkipped.workspacePackage.name}" cannot be created because ${firstSkipped.reason}`);
+	}
+	if (skipped.length > 0) {
+		for (const skippedPackage of skipped) {
+			console.warn(`Skipping "${skippedPackage.workspacePackage.name}" because ${skippedPackage.reason}`);
+		}
+	}
+	selectedPackages = dependencyAvailability.ready;
+	if (selectedPackages.length === 0) {
+		fatal("No snapshot-ready packages were selected");
+	}
+
 	const selectedNames = new Set(selectedPackages.map((entry) => entry.name));
 	const snapshotRoot = mkdtempSync(join(tmpdir(), "agent-os-package-snapshots-"));
 	const remoteUrl = remoteUrlForRepo(options.repo);
@@ -495,10 +658,6 @@ function main() {
 			remoteUrl,
 			selectedPackages.map((entry) => tagNameForPackage(entry.name, options.tagPrefix, options.snapshot)),
 		);
-	}
-
-	if (options.build) {
-		buildSelectedPackages(selectedPackages, workspaceByName);
 	}
 
 	const manifestEntries: ManifestEntry[] = [];

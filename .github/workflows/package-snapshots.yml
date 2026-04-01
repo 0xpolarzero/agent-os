@@ -1,30 +1,37 @@
 name: Package Snapshots
 
 on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       ref:
         description: Git ref to snapshot
-        required: true
+        required: false
         default: main
         type: string
       packages:
-        description: Comma- or newline-separated package names or paths
-        required: true
+        description: Comma- or newline-separated package names or paths, or all
+        required: false
+        default: all
         type: string
       snapshot:
         description: Snapshot label used in generated tags (for example 20260401.1)
-        required: true
+        required: false
         type: string
       tag-prefix:
         description: Prefix for generated snapshot tags
-        required: true
+        required: false
         default: snapshot
         type: string
 
 jobs:
   publish:
-    name: Publish package snapshots
+    name: Package snapshots
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -32,7 +39,7 @@ jobs:
       - name: Checkout ref
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -47,21 +54,72 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Publish snapshots
+      - name: Resolve snapshot settings
+        id: config
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_PACKAGES: ${{ inputs.packages }}
+          DISPATCH_SNAPSHOT: ${{ inputs.snapshot }}
+          DISPATCH_TAG_PREFIX: ${{ inputs['tag-prefix'] }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          packages="${DISPATCH_PACKAGES:-all}"
+          tag_prefix="${DISPATCH_TAG_PREFIX:-snapshot}"
+          publish=false
+
+          short_sha="${SHA::12}"
+
+          case "$EVENT_NAME" in
+            workflow_dispatch)
+              snapshot="${DISPATCH_SNAPSHOT:-manual-${short_sha}.${RUN_ATTEMPT}}"
+              publish=true
+              ;;
+            push)
+              packages="all"
+              snapshot="${REF_NAME}-${short_sha}.${RUN_ATTEMPT}"
+              publish=true
+              ;;
+            pull_request)
+              packages="all"
+              snapshot="pr-${PR_NUMBER}-${short_sha}.${RUN_ATTEMPT}"
+              ;;
+            *)
+              echo "Unsupported event: $EVENT_NAME" >&2
+              exit 1
+              ;;
+          esac
+
+          echo "packages=$packages" >> "$GITHUB_OUTPUT"
+          echo "snapshot=$snapshot" >> "$GITHUB_OUTPUT"
+          echo "tag_prefix=$tag_prefix" >> "$GITHUB_OUTPUT"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+
+      - name: Run package snapshots
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          SNAPSHOT_PACKAGES: ${{ inputs.packages }}
-          SNAPSHOT_LABEL: ${{ inputs.snapshot }}
-          SNAPSHOT_TAG_PREFIX: ${{ inputs['tag-prefix'] }}
+          SNAPSHOT_PACKAGES: ${{ steps.config.outputs.packages }}
+          SNAPSHOT_LABEL: ${{ steps.config.outputs.snapshot }}
+          SNAPSHOT_TAG_PREFIX: ${{ steps.config.outputs.tag_prefix }}
+          SHOULD_PUSH: ${{ steps.config.outputs.publish }}
         run: |
-          pnpm exec tsx scripts/package-snapshots.ts \
-            --packages "$SNAPSHOT_PACKAGES" \
-            --snapshot "$SNAPSHOT_LABEL" \
-            --tag-prefix "$SNAPSHOT_TAG_PREFIX" \
-            --repo "${{ github.repository }}" \
-            --manifest package-snapshot-manifest.json \
-            --build \
-            --push
+          args=(
+            --packages "$SNAPSHOT_PACKAGES"
+            --snapshot "$SNAPSHOT_LABEL"
+            --tag-prefix "$SNAPSHOT_TAG_PREFIX"
+            --repo "${{ github.repository }}"
+            --manifest package-snapshot-manifest.json
+            --build
+          )
+
+          if [[ "$SHOULD_PUSH" == "true" ]]; then
+            args+=(--push)
+          fi
+
+          pnpm exec tsx scripts/package-snapshots.ts "${args[@]}"
 
       - name: Upload manifest
         uses: actions/upload-artifact@v4
@@ -73,6 +131,11 @@ jobs:
         run: |
           {
             echo "## Package snapshots"
+            echo
+            echo "- Event: \`${{ github.event_name }}\`"
+            echo "- Packages: \`${{ steps.config.outputs.packages }}\`"
+            echo "- Snapshot: \`${{ steps.config.outputs.snapshot }}\`"
+            echo "- Publish tags: \`${{ steps.config.outputs.publish }}\`"
             echo
             echo "| Package | Tag | URL |"
             echo "| --- | --- | --- |"
