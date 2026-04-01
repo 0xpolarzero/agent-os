@@ -4,13 +4,13 @@
 	"type": "module",
 	"license": "Apache-2.0",
 	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
+	"types": "./src/index.ts",
 	"bin": {
 		"pi-sdk-acp": "./dist/adapter.js"
 	},
 	"exports": {
 		".": {
-			"types": "./dist/index.d.ts",
+			"types": "./src/index.ts",
 			"import": "./dist/index.js",
 			"default": "./dist/index.js"
 		}
