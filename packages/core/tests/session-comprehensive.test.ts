@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ManagedProcess } from "@secure-exec/core";
@@ -185,8 +185,7 @@ function buildSessionInitData(
 ): SessionInitData {
 	const initData: SessionInitData = {};
 	if (initResult.agentCapabilities) {
-		initData.capabilities =
-			initResult.agentCapabilities as AgentCapabilities;
+		initData.capabilities = initResult.agentCapabilities as AgentCapabilities;
 	}
 	if (initResult.agentInfo) {
 		initData.agentInfo = initResult.agentInfo as SessionInitData["agentInfo"];
@@ -300,10 +299,7 @@ describe("comprehensive session API tests", () => {
 	});
 
 	test("permission request flow -- mock agent sends permission request, test calls respondPermission, agent continues", async () => {
-		const { sessionId } = await createTrackedSession(
-			vm,
-			"/tmp/perm-mock.mjs",
-		);
+		const { sessionId } = await createTrackedSession(vm, "/tmp/perm-mock.mjs");
 
 		const permissionRequests: {
 			permissionId: string;
@@ -328,18 +324,15 @@ describe("comprehensive session API tests", () => {
 			"once",
 		);
 		expect(permResp.error).toBeUndefined();
-		expect(
-			(permResp.result as { acknowledged: boolean }).acknowledged,
-		).toBe(true);
+		expect((permResp.result as { acknowledged: boolean }).acknowledged).toBe(
+			true,
+		);
 
 		vm.closeSession(sessionId);
 	}, 30_000);
 
 	test("setMode changes session mode", async () => {
-		const { sessionId } = await createTrackedSession(
-			vm,
-			"/tmp/mode-mock.mjs",
-		);
+		const { sessionId } = await createTrackedSession(vm, "/tmp/mode-mock.mjs");
 
 		const response = await vm.setSessionMode(sessionId, "plan");
 		expect(response.error).toBeUndefined();
@@ -351,10 +344,7 @@ describe("comprehensive session API tests", () => {
 	}, 30_000);
 
 	test("setModel changes model configuration", async () => {
-		const { sessionId } = await createTrackedSession(
-			vm,
-			"/tmp/model-mock.mjs",
-		);
+		const { sessionId } = await createTrackedSession(vm, "/tmp/model-mock.mjs");
 
 		const response = await vm.setSessionModel(sessionId, "opus");
 		expect(response.error).toBeUndefined();
@@ -403,8 +393,8 @@ describe("comprehensive session API tests", () => {
 		expect(vm.listSessions().length).toBe(2);
 
 		// Both have independent capabilities
-		expect(vm.getSessionCapabilities(sessionId1)!.permissions).toBe(true);
-		expect(vm.getSessionCapabilities(sessionId2)!.permissions).toBe(true);
+		expect(vm.getSessionCapabilities(sessionId1)?.permissions).toBe(true);
+		expect(vm.getSessionCapabilities(sessionId2)?.permissions).toBe(true);
 
 		// Both have independent agent info
 		expect(vm.getSessionAgentInfo(sessionId1)).toEqual(
@@ -475,20 +465,12 @@ describe("comprehensive session API tests", () => {
 		vm.closeSession(sessionId);
 
 		expect(vm.listSessions().length).toBe(0);
-		expect(() => vm.resumeSession(sessionId)).toThrow(
-			"Session not found",
-		);
+		expect(() => vm.resumeSession(sessionId)).toThrow("Session not found");
 	}, 30_000);
 
 	test("dispose with multiple active sessions closes all", async () => {
-		const { sessionId: sessionId1 } = await createTrackedSession(
-			vm,
-			"/tmp/dispose-mock-1.mjs",
-		);
-		const { sessionId: sessionId2 } = await createTrackedSession(
-			vm,
-			"/tmp/dispose-mock-2.mjs",
-		);
+		await createTrackedSession(vm, "/tmp/dispose-mock-1.mjs");
+		await createTrackedSession(vm, "/tmp/dispose-mock-2.mjs");
 
 		expect(vm.listSessions().length).toBe(2);
 
@@ -622,21 +604,60 @@ describe("comprehensive session API tests", () => {
 		}
 	}, 30_000);
 
-	test("session capabilities and agent info remain accessible after session registration", async () => {
-		const { sessionId } = await createTrackedSession(
-			vm,
-			"/tmp/caps-mock.mjs",
+	test("createSession rejects session/new responses without a sessionId", async () => {
+		const adapterPackageName = "mock-missing-session-id-adapter";
+		const agentType = "missing-session-id-mock";
+		const moduleAccessCwd = await mkdtemp(
+			join(tmpdir(), "agent-os-session-metadata-"),
 		);
 
-		const caps = vm.getSessionCapabilities(sessionId)!;
-		expect(caps.permissions).toBe(true);
-		expect(caps.plan_mode).toBe(true);
-		expect(caps.questions).toBe(false);
-		expect(caps.tool_calls).toBe(true);
-		expect(caps.text_messages).toBe(true);
-		expect(caps.images).toBe(false);
-		expect(caps.session_lifecycle).toBe(true);
-		expect(caps.mcp_tools).toBe(true);
+		try {
+			await createMockAdapterPackage(
+				moduleAccessCwd,
+				adapterPackageName,
+				COMPREHENSIVE_MOCK.replace(
+					"sessionId: 'comp-session-' + sessionCounter,\n",
+					"",
+				),
+			);
+
+			const sessionVm = await AgentOs.create({ moduleAccessCwd });
+			try {
+				getAgentOsTestInternals(sessionVm)._softwareAgentConfigs.set(
+					agentType,
+					{
+						acpAdapter: adapterPackageName,
+						agentPackage: adapterPackageName,
+					},
+				);
+
+				await expect(
+					sessionVm.createSession(agentType, {
+						cwd: "/home/user",
+					}),
+				).rejects.toThrow("ACP session/new failed: missing sessionId");
+				expect(sessionVm.listSessions()).toEqual([]);
+			} finally {
+				await sessionVm.dispose();
+			}
+		} finally {
+			await rm(moduleAccessCwd, { recursive: true, force: true });
+		}
+	}, 30_000);
+
+	test("session capabilities and agent info remain accessible after session registration", async () => {
+		const { sessionId } = await createTrackedSession(vm, "/tmp/caps-mock.mjs");
+
+		const caps = vm.getSessionCapabilities(sessionId);
+		expect(caps).not.toBeNull();
+		expect(caps?.permissions).toBe(true);
+		expect(caps?.plan_mode).toBe(true);
+		expect(caps?.questions).toBe(false);
+		expect(caps?.tool_calls).toBe(true);
+		expect(caps?.text_messages).toBe(true);
+		expect(caps?.images).toBe(false);
+		expect(caps?.session_lifecycle).toBe(true);
+		expect(caps?.mcp_tools).toBe(true);
 
 		expect(vm.getSessionAgentInfo(sessionId)).toEqual({
 			name: "comprehensive-agent",
@@ -662,13 +683,13 @@ describe("comprehensive session API tests", () => {
 		expect(sequenced.length).toBeGreaterThanOrEqual(1);
 
 		const events = sequenced.map((e) => e.notification);
-		const updateEvents = events.filter(
-			(e) => e.method === "session/update",
-		);
+		const updateEvents = events.filter((e) => e.method === "session/update");
 		expect(updateEvents.length).toBeGreaterThanOrEqual(1);
 
 		// Filter by method
-		const filtered = vm.getSessionEvents(sessionId, { method: "session/update" });
+		const filtered = vm.getSessionEvents(sessionId, {
+			method: "session/update",
+		});
 		expect(filtered.length).toBe(updateEvents.length);
 
 		// Sequenced events have sequence numbers
@@ -703,9 +724,7 @@ describe("comprehensive session API tests", () => {
 		expect(response.error).toBeUndefined();
 
 		// Throws for unknown sessionId
-		expect(() => vm.resumeSession("nonexistent")).toThrow(
-			"Session not found",
-		);
+		expect(() => vm.resumeSession("nonexistent")).toThrow("Session not found");
 
 		vm.closeSession(sessionId);
 	}, 30_000);
@@ -866,10 +885,7 @@ describe("comprehensive session API tests", () => {
 			cwd: "/home/user",
 			mcpServers: [],
 		});
-		const initResult2 = getSessionResultRecord(
-			initResp2.result,
-			"initialize",
-		);
+		const initResult2 = getSessionResultRecord(initResp2.result, "initialize");
 		const sessionResult2 = getSessionResultRecord(
 			sessionResp2.result,
 			"session/new",
