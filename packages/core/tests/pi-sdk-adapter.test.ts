@@ -505,5 +505,5 @@ describe("pi-sdk-acp adapter manual spawn", () => {
 				(update) => update.currentModeId === nextThought,
 			),
 		).toBe(true);
-		}, 90_000);
-	});
+	}, 90_000);
+});

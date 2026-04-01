@@ -1105,7 +1105,7 @@ export class AgentOs {
 		return this._requireSession(sessionId).setMode(modeId);
 	}
 
-	/** Returns available modes from the agent's reported capabilities. */
+	/** Returns available modes from the agent's reported session state. */
 	getSessionModes(sessionId: string): SessionModeState | null {
 		return this._requireSession(sessionId).getModes();
 	}

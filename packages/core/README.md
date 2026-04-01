@@ -175,9 +175,9 @@ await vm.dispose();
 - `SessionInitData` — Session metadata hydrated from ACP initialize and session/new
 - `SessionMode` — A mode the agent supports
 - `SessionModeState` — Current mode and available modes
-- `SessionModel` — A model the agent supports
-- `SessionModelState` — Current model and available model IDs
-- `SessionConfigOption` — A configuration option the agent supports
+- `SessionModel` — A model the agent supports for a session
+- `SessionModelState` — Current model and available models
+- `SessionConfigOption` — An ACP-shaped session configuration option
 - `AgentCapabilities` — Boolean capability flags from the agent
 - `AgentInfo` — Agent identity (name, version)
 - `PermissionRequest` — Permission request from an agent

@@ -46,15 +46,40 @@ export interface SessionModelState {
 	availableModels: SessionModel[];
 }
 
-/** A configuration option the agent supports. */
-export interface SessionConfigOption {
+/** A selectable configuration value the agent supports. */
+export interface SessionConfigSelectValue {
+	value: string;
+	name: string;
+	description?: string;
+}
+
+/** Common metadata for session configuration options. */
+interface SessionConfigOptionBase {
 	id: string;
 	category?: string;
-	label?: string;
+	name: string;
 	description?: string;
-	currentValue?: string;
-	allowedValues?: Array<{ id: string; label?: string }>;
 }
+
+/** A select configuration option the agent supports. */
+export interface SessionConfigSelectOption
+	extends SessionConfigOptionBase {
+	type: "select";
+	currentValue?: string;
+	options: SessionConfigSelectValue[];
+}
+
+/** A boolean configuration option the agent supports. */
+export interface SessionConfigBooleanOption
+	extends SessionConfigOptionBase {
+	type: "boolean";
+	currentValue: boolean;
+}
+
+/** A configuration option the agent supports. */
+export type SessionConfigOption =
+	| SessionConfigSelectOption
+	| SessionConfigBooleanOption;
 
 /** Boolean capability flags reported by the agent during initialize. */
 export interface AgentCapabilities {
@@ -261,7 +286,7 @@ export class Session {
 		});
 	}
 
-	/** Returns available modes from the agent's reported capabilities. */
+	/** Returns available modes from the agent's reported session state. */
 	getModes(): SessionModeState | null {
 		return this._modes;
 	}
@@ -291,7 +316,7 @@ export class Session {
 		return this._setConfigByCategory("thought_level", level);
 	}
 
-	/** Returns available config options from the agent. */
+	/** Returns available config options from the agent's reported session state. */
 	getConfigOptions(): SessionConfigOption[] {
 		return this._configOptions;
 	}
