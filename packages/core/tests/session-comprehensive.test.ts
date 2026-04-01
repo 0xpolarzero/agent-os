@@ -9,6 +9,7 @@ import type { AgentConfig } from "../src/agents.js";
 import type {
 	AgentCapabilities,
 	SessionConfigOption,
+	SessionModelState,
 	SessionModeState,
 } from "../src/session.js";
 import { Session, type SessionInitData } from "../src/session.js";
@@ -22,7 +23,16 @@ import { createStdoutLineIterable } from "../src/stdout-lines.js";
  * If prompt text contains "permission", sends a request/permission notification.
  * Each session/new call returns a unique sessionId.
  */
-const COMPREHENSIVE_MOCK = `
+function buildComprehensiveMock(options?: {
+	sessionPrefix?: string;
+	includeInitializeModels?: boolean;
+	includeSessionModels?: boolean;
+}): string {
+	const sessionPrefix = options?.sessionPrefix ?? "comp-session";
+	const initializeModels = options?.includeInitializeModels ?? true;
+	const sessionModels = options?.includeSessionModels ?? true;
+
+	return `
 let buffer = '';
 let sessionCounter = 0;
 
@@ -62,7 +72,18 @@ process.stdin.on('data', (chunk) => {
               status: true,
               streaming_deltas: false,
               mcp_tools: true,
-            }
+            },
+            ${
+				initializeModels
+					? `models: {
+              currentModelId: 'default',
+              availableModels: [
+                { modelId: 'default', name: 'Default' },
+                { modelId: 'opus', name: 'Opus', description: 'High capability model' },
+              ],
+            },`
+					: ""
+			}
           };
           break;
 
@@ -70,19 +91,30 @@ process.stdin.on('data', (chunk) => {
           sessionCounter++;
           const mcpServers = (msg.params && msg.params.mcpServers) || [];
           result = {
-            sessionId: 'comp-session-' + sessionCounter,
+            sessionId: '${sessionPrefix}-' + sessionCounter,
             mcpServers,
             modes: {
               currentModeId: 'normal',
               availableModes: [
-                { id: 'normal', label: 'Normal' },
-                { id: 'plan', label: 'Plan' },
+              { id: 'normal', label: 'Normal' },
+              { id: 'plan', label: 'Plan' },
               ],
             },
             configOptions: [
               { id: 'model-opt', category: 'model', label: 'Model', currentValue: 'default', allowedValues: [{ id: 'default' }, { id: 'opus' }] },
               { id: 'thought-opt', category: 'thought_level', label: 'Thought Level', currentValue: 'medium' },
             ],
+            ${
+				sessionModels
+					? `models: {
+              currentModelId: 'default',
+              availableModels: [
+                { modelId: 'default', name: 'Default' },
+                { modelId: 'opus', name: 'Opus', description: 'High capability model' },
+              ],
+            },`
+					: ""
+			}
           };
           break;
         }
@@ -126,6 +158,10 @@ process.stdin.on('data', (chunk) => {
           result = { configId: msg.params.configId, value: msg.params.value, applied: true };
           break;
 
+        case 'session/set_model':
+          result = {};
+          break;
+
         case 'request/permission':
           result = { acknowledged: true };
           break;
@@ -149,6 +185,7 @@ process.stdin.on('data', (chunk) => {
   }
 });
 `;
+}
 
 let globalSessionCounter = 0;
 
@@ -197,6 +234,9 @@ function buildSessionInitData(
 		initData.configOptions =
 			sessionResult.configOptions as SessionConfigOption[];
 	}
+	if (sessionResult.models) {
+		initData.models = sessionResult.models as SessionModelState;
+	}
 	return initData;
 }
 
@@ -238,10 +278,7 @@ async function createTrackedSession(
 }> {
 	// Inject a unique prefix so each adapter process generates unique session IDs
 	const prefix = `s${++globalSessionCounter}`;
-	const script = COMPREHENSIVE_MOCK.replace(
-		"'comp-session-' + sessionCounter",
-		`'${prefix}-' + sessionCounter`,
-	);
+	const script = buildComprehensiveMock({ sessionPrefix: prefix });
 	await vm.writeFile(scriptPath, script);
 	const { iterable, onStdout } = createStdoutLineIterable();
 	const proc = vm.kernel.spawn("node", [scriptPath], {
@@ -343,19 +380,80 @@ describe("comprehensive session API tests", () => {
 		vm.closeSession(sessionId);
 	}, 30_000);
 
-	test("setModel changes model configuration", async () => {
-		const { sessionId } = await createTrackedSession(vm, "/tmp/model-mock.mjs");
+	test("setModel uses ACP session/set_model", async () => {
+		const { sessionId } = await createTrackedSession(
+			vm,
+			"/tmp/model-mock.mjs",
+		);
 
 		const response = await vm.setSessionModel(sessionId, "opus");
 		expect(response.error).toBeUndefined();
-		const result = response.result as {
-			configId: string;
-			value: string;
-			applied: boolean;
-		};
-		expect(result.configId).toBe("model-opt");
-		expect(result.value).toBe("opus");
-		expect(result.applied).toBe(true);
+		expect(response.result).toEqual({});
+
+		vm.closeSession(sessionId);
+	}, 30_000);
+
+	test("getSessionModelState returns model state from session/new", async () => {
+		const { sessionId } = await createTrackedSession(
+			vm,
+			"/tmp/model-state-mock.mjs",
+		);
+
+		const models = vm.getSessionModelState(sessionId);
+		expect(models).not.toBeNull();
+		expect(models?.currentModelId).toBe("default");
+		expect(models?.availableModels).toHaveLength(2);
+		expect(models?.availableModels[0]).toEqual({
+			modelId: "default",
+			name: "Default",
+		});
+		expect(models?.availableModels[1]).toEqual({
+			modelId: "opus",
+			name: "Opus",
+			description: "High capability model",
+		});
+
+		vm.closeSession(sessionId);
+	}, 30_000);
+
+	test("getSessionModelState is null when session/new omits models", async () => {
+		const script = buildComprehensiveMock({
+			sessionPrefix: "init-models",
+			includeSessionModels: false,
+		});
+		await vm.writeFile("/tmp/init-models-mock.mjs", script);
+		const { iterable, onStdout } = createStdoutLineIterable();
+		const proc = vm.kernel.spawn("node", ["/tmp/init-models-mock.mjs"], {
+			streamStdin: true,
+			onStdout,
+			env: { HOME: "/home/user" },
+		});
+		const client = new AcpClient(proc, iterable);
+
+		const initResp = await client.request("initialize", {
+			protocolVersion: 1,
+			clientCapabilities: {},
+		});
+		const sessionResp = await client.request("session/new", {
+			cwd: "/home/user",
+			mcpServers: [],
+		});
+
+		const initResult = getSessionResultRecord(initResp.result, "initialize");
+		const sessionResult = getSessionResultRecord(
+			sessionResp.result,
+			"session/new",
+		);
+		const sessionId = getSessionIdFromResult(sessionResult);
+		const initData = buildSessionInitData(initResult, sessionResult);
+
+		const { _sessions: sessions } = getAgentOsTestInternals(vm);
+		const session = new Session(client, sessionId, "mock", initData, () => {
+			sessions.delete(sessionId);
+		});
+		sessions.set(sessionId, session);
+
+		expect(vm.getSessionModelState(sessionId)).toBeNull();
 
 		vm.closeSession(sessionId);
 	}, 30_000);
@@ -498,7 +596,7 @@ describe("comprehensive session API tests", () => {
 
 	test("createSession with mcpServers passes config through to agent", async () => {
 		// Use manual adapter spawn to verify mcpServers are sent in session/new
-		await vm.writeFile("/tmp/mcp-mock.mjs", COMPREHENSIVE_MOCK);
+		await vm.writeFile("/tmp/mcp-mock.mjs", buildComprehensiveMock());
 		const { iterable, onStdout } = createStdoutLineIterable();
 		const proc = vm.kernel.spawn("node", ["/tmp/mcp-mock.mjs"], {
 			streamStdin: true,
@@ -542,7 +640,7 @@ describe("comprehensive session API tests", () => {
 			await createMockAdapterPackage(
 				moduleAccessCwd,
 				adapterPackageName,
-				COMPREHENSIVE_MOCK,
+				buildComprehensiveMock(),
 			);
 
 			const sessionVm = await AgentOs.create({ moduleAccessCwd });
@@ -615,7 +713,7 @@ describe("comprehensive session API tests", () => {
 			await createMockAdapterPackage(
 				moduleAccessCwd,
 				adapterPackageName,
-				COMPREHENSIVE_MOCK.replace(
+				buildComprehensiveMock().replace(
 					"sessionId: 'comp-session-' + sessionCounter,\n",
 					"",
 				),
@@ -752,10 +850,9 @@ describe("comprehensive session API tests", () => {
 
 	test("setThoughtLevel falls back to category as configId when no matching option", async () => {
 		// Create a session with no configOptions so there's no thought_level category match
-		const script = COMPREHENSIVE_MOCK.replace(
-			"'comp-session-' + sessionCounter",
-			"'no-config-' + sessionCounter",
-		).replace(/configOptions: \[[\s\S]*?\],\n/, "configOptions: [],\n");
+		const script = buildComprehensiveMock({
+			sessionPrefix: "no-config",
+		}).replace(/configOptions: \[[\s\S]*?\],\n/, "configOptions: [],\n");
 		await vm.writeFile("/tmp/no-config-mock.mjs", script);
 		const { iterable, onStdout } = createStdoutLineIterable();
 		const proc = vm.kernel.spawn("node", ["/tmp/no-config-mock.mjs"], {
@@ -861,10 +958,9 @@ describe("comprehensive session API tests", () => {
 
 		// 2. getSessionModes() returns null when a session was created without modes
 		// Create a second session using an adapter that returns no modes
-		const noModesScript = COMPREHENSIVE_MOCK.replace(
-			"'comp-session-' + sessionCounter",
-			"'no-modes-' + sessionCounter",
-		).replace(
+		const noModesScript = buildComprehensiveMock({
+			sessionPrefix: "no-modes",
+		}).replace(
 			/modes: \{[\s\S]*?\},\n(\s*configOptions)/,
 			"// modes intentionally omitted\n$1",
 		);
