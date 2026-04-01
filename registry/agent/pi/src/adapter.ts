@@ -297,9 +297,10 @@ class PiSdkAgent implements Agent {
 
 	private async resolveModel(
 		modelId: string,
-		session: AgentSession = this.session ?? null,
+		session?: AgentSession | null,
 	): Promise<Model<Api>> {
-		if (!session) {
+		const resolvedSession = session ?? this.session;
+		if (!resolvedSession) {
 			throw RequestError.invalidRequest(undefined, "No session created");
 		}
 
@@ -307,7 +308,10 @@ class PiSdkAgent implements Agent {
 		if (slashIndex !== -1) {
 			const provider = modelId.slice(0, slashIndex);
 			const providerModelId = modelId.slice(slashIndex + 1);
-			const match = session.modelRegistry.find(provider, providerModelId);
+			const match = resolvedSession.modelRegistry.find(
+				provider,
+				providerModelId,
+			);
 			if (!match) {
 				throw RequestError.invalidParams(
 					{ modelId },
@@ -315,7 +319,7 @@ class PiSdkAgent implements Agent {
 				);
 			}
 
-			const apiKey = await session.modelRegistry.getApiKey(match);
+			const apiKey = await resolvedSession.modelRegistry.getApiKey(match);
 			if (!apiKey) {
 				throw RequestError.invalidParams(
 					{ modelId },
@@ -326,7 +330,7 @@ class PiSdkAgent implements Agent {
 			return match;
 		}
 
-		const availableModels = await session.modelRegistry.getAvailable();
+		const availableModels = await resolvedSession.modelRegistry.getAvailable();
 		const matches = availableModels.filter((model) => model.id === modelId);
 		if (matches.length === 0) {
 			throw RequestError.invalidParams(
@@ -347,7 +351,8 @@ class PiSdkAgent implements Agent {
 	// ── Event translation ───────────────────────────────────────────
 
 	private requireSession(sessionId: string): AgentSession {
-		if (!this.session) {
+		const session = this.session;
+		if (!session) {
 			throw RequestError.invalidRequest(
 				{ sessionId },
 				"No active session",
@@ -359,7 +364,7 @@ class PiSdkAgent implements Agent {
 				`Unknown session "${sessionId}"`,
 			);
 		}
-		return this.session;
+		return session;
 	}
 
 	private requireSelectValue(
@@ -410,7 +415,9 @@ class PiSdkAgent implements Agent {
 		});
 	}
 
-	private buildModeState(session: AgentSession): NewSessionResponse["modes"] {
+	private buildModeState(
+		session: AgentSession,
+	): NonNullable<NewSessionResponse["modes"]> {
 		const availableModes = session.getAvailableThinkingLevels();
 		const currentModeId =
 			availableModes.find((modeId) => modeId === session.thinkingLevel) ??
