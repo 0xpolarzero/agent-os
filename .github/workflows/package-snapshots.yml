@@ -1,0 +1,80 @@
+name: Package Snapshots
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to snapshot
+        required: true
+        default: main
+        type: string
+      packages:
+        description: Comma- or newline-separated package names or paths
+        required: true
+        type: string
+      snapshot:
+        description: Snapshot label used in generated tags (for example 20260401.1)
+        required: true
+        type: string
+      tag-prefix:
+        description: Prefix for generated snapshot tags
+        required: true
+        default: snapshot
+        type: string
+
+jobs:
+  publish:
+    name: Publish package snapshots
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Publish snapshots
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SNAPSHOT_PACKAGES: ${{ inputs.packages }}
+          SNAPSHOT_LABEL: ${{ inputs.snapshot }}
+          SNAPSHOT_TAG_PREFIX: ${{ inputs['tag-prefix'] }}
+        run: |
+          pnpm exec tsx scripts/package-snapshots.ts \
+            --packages "$SNAPSHOT_PACKAGES" \
+            --snapshot "$SNAPSHOT_LABEL" \
+            --tag-prefix "$SNAPSHOT_TAG_PREFIX" \
+            --repo "${{ github.repository }}" \
+            --manifest package-snapshot-manifest.json \
+            --build \
+            --push
+
+      - name: Upload manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-snapshot-manifest
+          path: package-snapshot-manifest.json
+
+      - name: Add workflow summary
+        run: |
+          {
+            echo "## Package snapshots"
+            echo
+            echo "| Package | Tag | URL |"
+            echo "| --- | --- | --- |"
+            jq -r '.[] | "| `\(.name)` | `\(.tag)` | [link](\(.url)) |"' package-snapshot-manifest.json
+          } >> "$GITHUB_STEP_SUMMARY"
