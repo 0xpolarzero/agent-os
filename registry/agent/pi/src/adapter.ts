@@ -14,7 +14,7 @@
 import {
 	type Agent,
 	AgentSideConnection,
-	type RequestError,
+	RequestError,
 	ndJsonStream,
 } from "@agentclientprotocol/sdk";
 import type {
@@ -23,13 +23,20 @@ import type {
 	CancelNotification,
 	InitializeRequest,
 	InitializeResponse,
+	ModelInfo,
 	NewSessionRequest,
 	NewSessionResponse,
 	PromptRequest,
 	PromptResponse,
+	SessionConfigOption,
+	SessionModelState,
+	SessionNotification,
+	SetSessionConfigOptionRequest,
+	SetSessionConfigOptionResponse,
 	SetSessionModeRequest,
 	SetSessionModeResponse,
-	SessionNotification,
+	SetSessionModelRequest,
+	SetSessionModelResponse,
 } from "@agentclientprotocol/sdk";
 import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
 import {
@@ -39,6 +46,10 @@ import {
 import type { AgentSession } from "@mariozechner/pi-coding-agent";
 import { isAbsolute, resolve as resolvePath } from "node:path";
 import { readFileSync } from "node:fs";
+import type { Api, Model } from "@mariozechner/pi-ai";
+
+const MODEL_CONFIG_ID = "model";
+const THOUGHT_LEVEL_CONFIG_ID = "thought_level";
 
 // ── CLI argument parsing ────────────────────────────────────────────
 
@@ -116,19 +127,11 @@ class PiSdkAgent implements Agent {
 		// Subscribe to Pi SDK events and translate to ACP notifications
 		session.subscribe((event) => this.handlePiEvent(event));
 
-		// Build thinking modes
-		const thinkingLevels = session.getAvailableThinkingLevels();
-		const modes = {
-			currentModeId: session.thinkingLevel,
-			availableModes: thinkingLevels.map((id) => ({
-				id,
-				name: `Thinking: ${id}`,
-			})),
-		};
-
 		return {
 			sessionId: this.sessionId,
-			modes,
+			modes: this.buildModeState(session),
+			configOptions: this.buildConfigOptions(session),
+			models: this.buildModelState(session),
 		};
 	}
 
@@ -174,16 +177,99 @@ class PiSdkAgent implements Agent {
 	async setSessionMode(
 		params: SetSessionModeRequest,
 	): Promise<SetSessionModeResponse | void> {
-		if (!this.session) return;
-
-		this.session.setThinkingLevel(
-			params.modeId as Parameters<AgentSession["setThinkingLevel"]>[0],
+		const session = this.requireSession(params.sessionId);
+		const availableModes = session.getAvailableThinkingLevels();
+		const matchedMode = availableModes.find(
+			(modeId) => modeId === params.modeId,
 		);
+		if (!matchedMode) {
+			throw RequestError.invalidParams(
+				{
+					modeId: params.modeId,
+					availableModes,
+				},
+				`Unsupported mode "${params.modeId}"`,
+			);
+		}
 
+		session.setThinkingLevel(matchedMode);
 		await this.emit({
-			sessionUpdate: "current_mode_update" as const,
-			currentModeId: params.modeId,
+			sessionUpdate: "current_mode_update",
+			currentModeId: matchedMode,
 		});
+		await this.emitConfigOptionsUpdate(session);
+		return {};
+	}
+
+	async unstable_setSessionModel(
+		params: SetSessionModelRequest,
+	): Promise<SetSessionModelResponse | void> {
+		const session = this.requireSession(params.sessionId);
+		const requestedModelId = String(params.modelId);
+		const currentModel = session.model;
+		if (
+			currentModel &&
+			this.toAcpModelId(currentModel) === requestedModelId
+		) {
+			return {};
+		}
+
+		const model = this.resolveModelByAcpId(session, requestedModelId);
+		if (!model) {
+			throw RequestError.invalidParams(
+				{ modelId: requestedModelId },
+				`Unknown model "${requestedModelId}"`,
+			);
+		}
+
+		await session.setModel(model);
+		await this.emitConfigOptionsUpdate(session);
+		return {};
+	}
+
+	async setSessionConfigOption(
+		params: SetSessionConfigOptionRequest,
+	): Promise<SetSessionConfigOptionResponse> {
+		const session = this.requireSession(params.sessionId);
+
+		if (params.configId === MODEL_CONFIG_ID) {
+			const model = this.requireSelectValue(params, MODEL_CONFIG_ID);
+			return this.setModelConfigOption(session, model);
+		}
+
+		if (params.configId === THOUGHT_LEVEL_CONFIG_ID) {
+			const thinkingLevel = this.requireSelectValue(
+				params,
+				THOUGHT_LEVEL_CONFIG_ID,
+			);
+			const availableLevels = session.getAvailableThinkingLevels();
+			const matchedLevel = availableLevels.find(
+				(level) => level === thinkingLevel,
+			);
+			if (!matchedLevel) {
+				throw RequestError.invalidParams(
+					{
+						configId: params.configId,
+						value: thinkingLevel,
+						availableValues: availableLevels,
+					},
+					`Unsupported thinking level "${thinkingLevel}"`,
+				);
+			}
+
+			session.setThinkingLevel(matchedLevel);
+			const configOptions = this.buildConfigOptions(session);
+			await this.emit({
+				sessionUpdate: "config_option_update",
+				configOptions,
+			});
+			return { configOptions };
+		}
+
+		throw RequestError.invalidParams(
+			{ configId: params.configId },
+			`Unsupported config option "${params.configId}"`,
+		);
 	}
 
 	async authenticate(
@@ -193,6 +279,192 @@ class PiSdkAgent implements Agent {
 	}
 
 	// ── Event translation ───────────────────────────────────────────
+
+	private requireSession(sessionId: string): AgentSession {
+		if (!this.session) {
+			throw RequestError.invalidRequest(
+				{ sessionId },
+				"No active session",
+			);
+		}
+		if (sessionId !== this.sessionId) {
+			throw RequestError.invalidParams(
+				{ sessionId },
+				`Unknown session "${sessionId}"`,
+			);
+		}
+		return this.session;
+	}
+
+	private requireSelectValue(
+		params: SetSessionConfigOptionRequest,
+		configId: string,
+	): string {
+		if ("type" in params && params.type === "boolean") {
+			throw RequestError.invalidParams(
+				{ configId, value: params.value },
+				`Config option "${configId}" expects a select value`,
+			);
+		}
+		return String(params.value);
+	}
+
+	private setModelConfigOption(
+		session: AgentSession,
+		requestedModelId: string,
+	): Promise<SetSessionConfigOptionResponse> {
+		const currentModel = session.model;
+		if (
+			currentModel &&
+			this.toAcpModelId(currentModel) === requestedModelId
+		) {
+			return Promise.resolve({
+				configOptions: this.buildConfigOptions(session),
+			});
+		}
+
+		const model = this.resolveModelByAcpId(session, requestedModelId);
+		if (!model) {
+			throw RequestError.invalidParams(
+				{ configId: MODEL_CONFIG_ID, value: requestedModelId },
+				`Unknown model "${requestedModelId}"`,
+			);
+		}
+
+		return session.setModel(model).then(async () => {
+			const configOptions = this.buildConfigOptions(session);
+			await this.emit({
+				sessionUpdate: "config_option_update",
+				configOptions,
+			});
+			return { configOptions };
+		});
+	}
+
+	private emitConfigOptionsUpdate(session: AgentSession): Promise<void> {
+		return this.emit({
+			sessionUpdate: "config_option_update",
+			configOptions: this.buildConfigOptions(session),
+		});
+	}
+
+	private buildModeState(session: AgentSession): NewSessionResponse["modes"] {
+		const availableModes = session.getAvailableThinkingLevels();
+		const currentModeId =
+			availableModes.find((modeId) => modeId === session.thinkingLevel) ??
+			availableModes[0] ??
+			"off";
+		return {
+			currentModeId,
+			availableModes: availableModes.map((modeId) => ({
+				id: modeId,
+				name: `Thinking: ${modeId}`,
+			})),
+		};
+	}
+
+	private buildConfigOptions(session: AgentSession): SessionConfigOption[] {
+		const configOptions: SessionConfigOption[] = [];
+		const modelState = this.buildModelState(session);
+		if (modelState) {
+			configOptions.push({
+				type: "select",
+				id: MODEL_CONFIG_ID,
+				name: "Model",
+				category: "model",
+				currentValue: modelState.currentModelId,
+				options: modelState.availableModels.map((model) => ({
+					value: model.modelId,
+					name: model.name,
+					description: model.description,
+				})),
+			});
+		}
+
+		const availableLevels = session.getAvailableThinkingLevels();
+		const currentThinkingLevel =
+			availableLevels.find((level) => level === session.thinkingLevel) ??
+			availableLevels[0] ??
+			"off";
+		configOptions.push({
+			type: "select",
+			id: THOUGHT_LEVEL_CONFIG_ID,
+			name: "Thinking Level",
+			category: "thought_level",
+			currentValue: currentThinkingLevel,
+			options: availableLevels.map((level) => ({
+				value: level,
+				name: level,
+			})),
+		});
+
+		return configOptions;
+	}
+
+	private buildModelState(
+		session: AgentSession,
+	): SessionModelState | undefined {
+		const currentModel = session.model;
+		if (!currentModel) {
+			return undefined;
+		}
+
+		const availableModels = this.getSelectableModels(session);
+		return {
+			currentModelId: this.toAcpModelId(currentModel),
+			availableModels: availableModels.map((model) =>
+				this.toModelInfo(model),
+			),
+		};
+	}
+
+	private getSelectableModels(session: AgentSession): Model<Api>[] {
+		const currentModel = session.model;
+		const availableModels = session.modelRegistry.getAvailable();
+		if (!currentModel) {
+			return availableModels;
+		}
+
+		return availableModels.some((model) =>
+			this.modelsMatch(model, currentModel),
+		)
+			? availableModels
+			: [currentModel, ...availableModels];
+	}
+
+	private resolveModelByAcpId(
+		session: AgentSession,
+		modelId: string,
+	): Model<Api> | undefined {
+		const [provider, ...modelIdParts] = modelId.split("/");
+		const providerModelId = modelIdParts.join("/");
+		if (!provider || !providerModelId) {
+			return undefined;
+		}
+		return this.getSelectableModels(session).find(
+			(model) =>
+				model.provider === provider && model.id === providerModelId,
+		);
+	}
+
+	private toModelInfo(model: Model<Api>): ModelInfo {
+		return {
+			modelId: this.toAcpModelId(model),
+			name: model.name,
+			description: `${model.provider}/${model.id}`,
+		};
+	}
+
+	private toAcpModelId(model: Pick<Model<Api>, "provider" | "id">): string {
+		return `${model.provider}/${model.id}`;
+	}
+
+	private modelsMatch(
+		left: Pick<Model<Api>, "provider" | "id">,
+		right: Pick<Model<Api>, "provider" | "id">,
+	): boolean {
+		return left.provider === right.provider && left.id === right.id;
+	}
 
 	private emit(update: SessionNotification["update"]): Promise<void> {
 		this.lastEmit = this.lastEmit
