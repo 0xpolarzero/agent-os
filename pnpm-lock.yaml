@@ -29,6 +29,9 @@ importers:
       '@types/node':
         specifier: ^22.19.15
         version: 22.19.15
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
       turbo:
         specifier: ^2.5.6
         version: 2.9.1
@@ -64,28 +67,6 @@ importers:
         specifier: ^5.7.2
         version: 5.9.3
 
-  examples/doom:
-    dependencies:
-      '@rivet-dev/agent-os-posix':
-        specifier: workspace:*
-        version: link:../../packages/posix
-      '@secure-exec/core':
-        specifier: ^0.2.1
-        version: 0.2.1
-      '@secure-exec/nodejs':
-        specifier: ^0.2.1
-        version: 0.2.1
-    devDependencies:
-      '@types/node':
-        specifier: ^22.10.2
-        version: 22.19.15
-      tsx:
-        specifier: ^4.19.2
-        version: 4.21.0
-      typescript:
-        specifier: ^5.7.2
-        version: 5.9.3
-
   examples/quickstart:
     dependencies:
       '@rivet-dev/agent-os-common':
@@ -106,6 +87,9 @@ importers:
       '@rivet-dev/agent-os-sandbox':
         specifier: link:../../registry/tool/sandbox
         version: link:../../registry/tool/sandbox
+      pyodide:
+        specifier: ^0.28.3
+        version: 0.28.3
       sandbox-agent:
         specifier: ^0.4.2
         version: 0.4.2(zod@3.25.76)
