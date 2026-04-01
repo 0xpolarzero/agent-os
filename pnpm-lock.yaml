@@ -64,48 +64,29 @@ importers:
         specifier: ^5.7.2
         version: 5.9.3
 
-  examples/doom:
-    dependencies:
-      '@rivet-dev/agent-os-posix':
-        specifier: workspace:*
-        version: link:../../packages/posix
-      '@secure-exec/core':
-        specifier: ^0.2.1
-        version: 0.2.1
-      '@secure-exec/nodejs':
-        specifier: ^0.2.1
-        version: 0.2.1
-    devDependencies:
-      '@types/node':
-        specifier: ^22.10.2
-        version: 22.19.15
-      tsx:
-        specifier: ^4.19.2
-        version: 4.21.0
-      typescript:
-        specifier: ^5.7.2
-        version: 5.9.3
-
   examples/quickstart:
     dependencies:
       '@rivet-dev/agent-os-common':
-        specifier: link:../../registry/software/common
+        specifier: workspace:*
         version: link:../../registry/software/common
       '@rivet-dev/agent-os-core':
         specifier: workspace:*
         version: link:../../packages/core
       '@rivet-dev/agent-os-git':
-        specifier: link:../../registry/software/git
+        specifier: workspace:*
         version: link:../../registry/software/git
       '@rivet-dev/agent-os-pi':
-        specifier: link:../../registry/agent/pi
+        specifier: workspace:*
         version: link:../../registry/agent/pi
       '@rivet-dev/agent-os-s3':
-        specifier: link:../../registry/file-system/s3
+        specifier: workspace:*
         version: link:../../registry/file-system/s3
       '@rivet-dev/agent-os-sandbox':
-        specifier: link:../../registry/tool/sandbox
+        specifier: workspace:*
         version: link:../../registry/tool/sandbox
+      pyodide:
+        specifier: ^0.28.3
+        version: 0.28.3
       sandbox-agent:
         specifier: ^0.4.2
         version: 0.4.2(zod@3.25.76)
@@ -176,58 +157,58 @@ importers:
         specifier: ^0.60.0
         version: 0.60.0(ws@8.20.0)(zod@3.25.76)
       '@rivet-dev/agent-os-codex':
-        specifier: link:../../registry/software/codex
+        specifier: workspace:*
         version: link:../../registry/software/codex
       '@rivet-dev/agent-os-coreutils':
-        specifier: link:../../registry/software/coreutils
+        specifier: workspace:*
         version: link:../../registry/software/coreutils
       '@rivet-dev/agent-os-curl':
-        specifier: link:../../registry/software/curl
+        specifier: workspace:*
         version: link:../../registry/software/curl
       '@rivet-dev/agent-os-diffutils':
-        specifier: link:../../registry/software/diffutils
+        specifier: workspace:*
         version: link:../../registry/software/diffutils
       '@rivet-dev/agent-os-fd':
-        specifier: link:../../registry/software/fd
+        specifier: workspace:*
         version: link:../../registry/software/fd
       '@rivet-dev/agent-os-file':
-        specifier: link:../../registry/software/file
+        specifier: workspace:*
         version: link:../../registry/software/file
       '@rivet-dev/agent-os-findutils':
-        specifier: link:../../registry/software/findutils
+        specifier: workspace:*
         version: link:../../registry/software/findutils
       '@rivet-dev/agent-os-gawk':
-        specifier: link:../../registry/software/gawk
+        specifier: workspace:*
         version: link:../../registry/software/gawk
       '@rivet-dev/agent-os-grep':
-        specifier: link:../../registry/software/grep
+        specifier: workspace:*
         version: link:../../registry/software/grep
       '@rivet-dev/agent-os-gzip':
-        specifier: link:../../registry/software/gzip
+        specifier: workspace:*
         version: link:../../registry/software/gzip
       '@rivet-dev/agent-os-jq':
-        specifier: link:../../registry/software/jq
+        specifier: workspace:*
         version: link:../../registry/software/jq
       '@rivet-dev/agent-os-pi':
-        specifier: link:../../registry/agent/pi
+        specifier: workspace:*
         version: link:../../registry/agent/pi
       '@rivet-dev/agent-os-pi-cli':
-        specifier: link:../../registry/agent/pi-cli
+        specifier: workspace:*
         version: link:../../registry/agent/pi-cli
       '@rivet-dev/agent-os-ripgrep':
-        specifier: link:../../registry/software/ripgrep
+        specifier: workspace:*
         version: link:../../registry/software/ripgrep
       '@rivet-dev/agent-os-sed':
-        specifier: link:../../registry/software/sed
+        specifier: workspace:*
         version: link:../../registry/software/sed
       '@rivet-dev/agent-os-tar':
-        specifier: link:../../registry/software/tar
+        specifier: workspace:*
         version: link:../../registry/software/tar
       '@rivet-dev/agent-os-tree':
-        specifier: link:../../registry/software/tree
+        specifier: workspace:*
         version: link:../../registry/software/tree
       '@rivet-dev/agent-os-yq':
-        specifier: link:../../registry/software/yq
+        specifier: workspace:*
         version: link:../../registry/software/yq
       '@types/node':
         specifier: ^22.10.2
@@ -471,7 +452,7 @@ importers:
         version: link:../make
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -483,7 +464,7 @@ importers:
   registry/software/codex:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -520,7 +501,7 @@ importers:
         version: link:../tar
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -532,7 +513,7 @@ importers:
   registry/software/coreutils:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -544,7 +525,7 @@ importers:
   registry/software/curl:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -556,7 +537,7 @@ importers:
   registry/software/diffutils:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -568,7 +549,7 @@ importers:
   registry/software/fd:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -580,7 +561,7 @@ importers:
   registry/software/file:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -592,7 +573,7 @@ importers:
   registry/software/findutils:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -604,7 +585,7 @@ importers:
   registry/software/gawk:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -616,7 +597,7 @@ importers:
   registry/software/git:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -628,7 +609,7 @@ importers:
   registry/software/grep:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -640,7 +621,7 @@ importers:
   registry/software/gzip:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -652,7 +633,7 @@ importers:
   registry/software/jq:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -664,7 +645,7 @@ importers:
   registry/software/make:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -676,7 +657,7 @@ importers:
   registry/software/ripgrep:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -688,7 +669,7 @@ importers:
   registry/software/sed:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -700,7 +681,7 @@ importers:
   registry/software/sqlite3:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -712,7 +693,7 @@ importers:
   registry/software/tar:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -724,7 +705,7 @@ importers:
   registry/software/tree:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -736,7 +717,7 @@ importers:
   registry/software/unzip:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -748,7 +729,7 @@ importers:
   registry/software/wget:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -760,7 +741,7 @@ importers:
   registry/software/yq:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -772,7 +753,7 @@ importers:
   registry/software/zip:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -800,10 +781,10 @@ importers:
         specifier: ^1.6.0
         version: 1.6.0
       '@rivet-dev/agent-os-common':
-        specifier: link:../../software/common
+        specifier: workspace:*
         version: link:../../software/common
       '@rivet-dev/agent-os-pi':
-        specifier: link:../../agent/pi
+        specifier: workspace:*
         version: link:../../agent/pi
       '@types/node':
         specifier: ^22.10.2

@@ -28,8 +28,8 @@
 	},
 	"devDependencies": {
 		"@copilotkit/llmock": "^1.6.0",
-		"@rivet-dev/agent-os-common": "link:../../software/common",
-		"@rivet-dev/agent-os-pi": "link:../../agent/pi",
+		"@rivet-dev/agent-os-common": "workspace:*",
+		"@rivet-dev/agent-os-pi": "workspace:*",
 		"@types/node": "^22.10.2",
 		"typescript": "^5.7.2",
 		"vitest": "^2.1.8"
