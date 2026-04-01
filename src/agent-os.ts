@@ -112,6 +112,7 @@ import {
 	type SequencedEvent,
 	type SessionConfigOption,
 	type SessionEventHandler,
+	type SessionModelState,
 	type SessionModeState,
 	type PermissionRequestHandler,
 } from "./session.js";
@@ -950,6 +951,10 @@ export class AgentOs {
 				initData.configOptions =
 					sessionResult.configOptions as SessionInitData["configOptions"];
 			}
+			if (sessionResult.models) {
+				initData.models =
+					sessionResult.models as SessionInitData["models"];
+			}
 		}
 
 		const session = new Session(
@@ -1103,6 +1108,11 @@ export class AgentOs {
 	/** Returns available modes from the agent's reported capabilities. */
 	getSessionModes(sessionId: string): SessionModeState | null {
 		return this._requireSession(sessionId).getModes();
+	}
+
+	/** Returns the current model state reported by the agent. */
+	getSessionModelState(sessionId: string): SessionModelState | null {
+		return this._requireSession(sessionId).getModelState();
 	}
 
 	/** Set the model for a session. */

@@ -108,6 +108,8 @@ export type {
 	SessionConfigOption,
 	SessionEventHandler,
 	SessionInitData,
+	SessionModel,
+	SessionModelState,
 	SessionMode,
 	SessionModeState,
 } from "./session.js";
