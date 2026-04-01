@@ -14,7 +14,7 @@
 
 --- /dev/null
 +++ b/library/std/src/sys/process/wasi.rs
-@@ -0,0 +1,627 @@
+@@ -0,0 +1,645 @@
 +// WASI process implementation using wasmVM host_process syscalls.
 +//
 +// Replaces the unsupported() stubs with real process management

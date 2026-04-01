@@ -47,11 +47,12 @@ for arg in "$@"; do
     esac
 done
 
-# Find all patch files in order (reversed for --reverse mode)
+# Find only the top-level std patch files in order (reversed for --reverse mode).
+# Nested crate and wasi-libc patches have their own application scripts.
 if [ "$MODE" = "reverse" ]; then
-    PATCH_FILES=$(find "$PATCHES_DIR" -name '*.patch' -type f 2>/dev/null | sort -r)
+    PATCH_FILES=$(find "$PATCHES_DIR" -maxdepth 1 -name '*.patch' -type f 2>/dev/null | sort -r)
 else
-    PATCH_FILES=$(find "$PATCHES_DIR" -name '*.patch' -type f 2>/dev/null | sort)
+    PATCH_FILES=$(find "$PATCHES_DIR" -maxdepth 1 -name '*.patch' -type f 2>/dev/null | sort)
 fi
 
 if [ -z "$PATCH_FILES" ]; then
