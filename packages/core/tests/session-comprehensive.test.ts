@@ -27,10 +27,12 @@ function buildComprehensiveMock(options?: {
 	sessionPrefix?: string;
 	includeInitializeModels?: boolean;
 	includeSessionModels?: boolean;
+	includeSessionConfigOptions?: boolean;
 }): string {
 	const sessionPrefix = options?.sessionPrefix ?? "comp-session";
 	const initializeModels = options?.includeInitializeModels ?? true;
 	const sessionModels = options?.includeSessionModels ?? true;
+	const sessionConfigOptions = options?.includeSessionConfigOptions ?? true;
 
 	return `
 let buffer = '';
@@ -100,10 +102,34 @@ process.stdin.on('data', (chunk) => {
               { id: 'plan', label: 'Plan' },
               ],
             },
-            configOptions: [
-              { id: 'model-opt', category: 'model', label: 'Model', currentValue: 'default', allowedValues: [{ id: 'default' }, { id: 'opus' }] },
-              { id: 'thought-opt', category: 'thought_level', label: 'Thought Level', currentValue: 'medium' },
-            ],
+            ${
+				sessionConfigOptions
+					? `configOptions: [
+              {
+                type: 'select',
+                id: 'model-opt',
+                category: 'model',
+                name: 'Model',
+                currentValue: 'default',
+                options: [
+                  { value: 'default', name: 'Default' },
+                  { value: 'opus', name: 'Opus' },
+                ],
+              },
+              {
+                type: 'select',
+                id: 'thought-opt',
+                category: 'thought_level',
+                name: 'Thinking Level',
+                currentValue: 'medium',
+                options: [
+                  { value: 'medium', name: 'medium' },
+                  { value: 'high', name: 'high' },
+                ],
+              },
+            ],`
+					: "configOptions: [],"
+			}
             ${
 				sessionModels
 					? `models: {
@@ -681,17 +707,26 @@ describe("comprehensive session API tests", () => {
 				});
 				expect(sessionVm.getSessionConfigOptions(sessionId)).toEqual([
 					{
+						type: "select",
 						id: "model-opt",
 						category: "model",
-						label: "Model",
+						name: "Model",
 						currentValue: "default",
-						allowedValues: [{ id: "default" }, { id: "opus" }],
+						options: [
+							{ value: "default", name: "Default" },
+							{ value: "opus", name: "Opus" },
+						],
 					},
 					{
+						type: "select",
 						id: "thought-opt",
 						category: "thought_level",
-						label: "Thought Level",
+						name: "Thinking Level",
 						currentValue: "medium",
+						options: [
+							{ value: "medium", name: "medium" },
+							{ value: "high", name: "high" },
+						],
 					},
 				]);
 			} finally {
@@ -852,7 +887,8 @@ describe("comprehensive session API tests", () => {
 		// Create a session with no configOptions so there's no thought_level category match
 		const script = buildComprehensiveMock({
 			sessionPrefix: "no-config",
-		}).replace(/configOptions: \[[\s\S]*?\],\n/, "configOptions: [],\n");
+			includeSessionConfigOptions: false,
+		});
 		await vm.writeFile("/tmp/no-config-mock.mjs", script);
 		const { iterable, onStdout } = createStdoutLineIterable();
 		const proc = vm.kernel.spawn("node", ["/tmp/no-config-mock.mjs"], {

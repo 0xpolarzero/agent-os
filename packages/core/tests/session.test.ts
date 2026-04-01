@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import type { LLMock } from "@copilotkit/llmock";
 import type { ManagedProcess } from "@secure-exec/core";
+import piSdk from "@rivet-dev/agent-os-pi";
 import {
 	afterAll,
 	afterEach,
@@ -255,6 +256,62 @@ describe("full createSession API", () => {
 			if (sessionId) {
 				vm.closeSession(sessionId);
 			}
+		}
+	}, 90_000);
+
+	test("createSession('pi') hydrates ACP-shaped config and model state", async () => {
+		const sdkVm = await AgentOs.create({
+			loopbackExemptPorts: [mockPort],
+			moduleAccessCwd: MODULE_ACCESS_CWD,
+			software: [piSdk],
+		});
+		let sessionId: string | undefined;
+
+		try {
+			const session = await sdkVm.createSession("pi", {
+				env: {
+					ANTHROPIC_API_KEY: "mock-key",
+					ANTHROPIC_BASE_URL: mockUrl,
+				},
+			});
+			sessionId = session.sessionId;
+
+			const modes = sdkVm.getSessionModes(sessionId);
+			expect(modes).not.toBeNull();
+			expect(modes?.currentModeId).toBeTruthy();
+			expect(modes?.availableModes.length ?? 0).toBeGreaterThan(0);
+
+			const models = sdkVm.getSessionModelState(sessionId);
+			expect(models).not.toBeNull();
+			expect(models?.currentModelId).toBeTruthy();
+			expect(models?.availableModels.length ?? 0).toBeGreaterThan(0);
+
+			const configOptions = sdkVm.getSessionConfigOptions(sessionId);
+			expect(configOptions.length).toBeGreaterThan(0);
+
+			const modelOption = configOptions.find(
+				(option) => option.category === "model",
+			);
+			expect(modelOption).toEqual(
+				expect.objectContaining({
+					type: "select",
+					name: "Model",
+					currentValue: models?.currentModelId,
+				}),
+			);
+			if (modelOption?.type === "select") {
+				expect(modelOption.options.length).toBeGreaterThan(0);
+				expect(
+					modelOption.options.some(
+						(option) => option.value === models?.currentModelId,
+					),
+				).toBe(true);
+			}
+		} finally {
+			if (sessionId) {
+				sdkVm.closeSession(sessionId);
+			}
+			await sdkVm.dispose();
 		}
 	}, 90_000);
 

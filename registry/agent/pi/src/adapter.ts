@@ -28,12 +28,15 @@ import type {
 	NewSessionResponse,
 	PromptRequest,
 	PromptResponse,
+	SessionConfigOption,
+	SessionModelState,
+	SessionNotification,
+	SetSessionConfigOptionRequest,
+	SetSessionConfigOptionResponse,
 	SetSessionModelRequest,
 	SetSessionModelResponse,
 	SetSessionModeRequest,
 	SetSessionModeResponse,
-	SessionNotification,
-	SessionModelState,
 } from "@agentclientprotocol/sdk";
 import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
 import {
@@ -44,6 +47,9 @@ import type { AgentSession } from "@mariozechner/pi-coding-agent";
 import type { Api, Model } from "@mariozechner/pi-ai";
 import { isAbsolute, resolve as resolvePath } from "node:path";
 import { readFileSync } from "node:fs";
+
+const MODEL_CONFIG_ID = "model";
+const THOUGHT_LEVEL_CONFIG_ID = "thought_level";
 
 // ── CLI argument parsing ────────────────────────────────────────────
 
@@ -133,20 +139,13 @@ class PiSdkAgent implements Agent {
 		// Subscribe to Pi SDK events and translate to ACP notifications
 		session.subscribe((event) => this.handlePiEvent(event));
 
-		// Build thinking modes
-		const thinkingLevels = session.getAvailableThinkingLevels();
-		const modes = {
-			currentModeId: session.thinkingLevel,
-			availableModes: thinkingLevels.map((id) => ({
-				id,
-				name: `Thinking: ${id}`,
-			})),
-		};
-		const models = await this.buildModelState();
+		const models = await this.buildModelState(session);
+		const configOptions = await this.buildConfigOptions(session, models);
 
 		return {
 			sessionId: this.sessionId,
-			modes,
+			modes: this.buildModeState(session),
+			configOptions,
 			...(models ? { models } : {}),
 		};
 	}
@@ -193,27 +192,82 @@ class PiSdkAgent implements Agent {
 	async setSessionMode(
 		params: SetSessionModeRequest,
 	): Promise<SetSessionModeResponse | void> {
-		if (!this.session) return;
-
-		this.session.setThinkingLevel(
-			params.modeId as Parameters<AgentSession["setThinkingLevel"]>[0],
+		const session = this.requireSession(params.sessionId);
+		const availableModes = session.getAvailableThinkingLevels();
+		const matchedMode = availableModes.find(
+			(modeId) => modeId === params.modeId,
 		);
+		if (!matchedMode) {
+			throw RequestError.invalidParams(
+				{
+					modeId: params.modeId,
+					availableModes,
+				},
+				`Unsupported mode "${params.modeId}"`,
+			);
+		}
 
-		await this.emit({
-			sessionUpdate: "current_mode_update" as const,
-			currentModeId: params.modeId,
-		});
+		session.setThinkingLevel(matchedMode);
+		await this.emitModeAndConfigUpdates(session);
+		return {};
 	}
 
 	async unstable_setSessionModel(
 		params: SetSessionModelRequest,
 	): Promise<SetSessionModelResponse | void> {
-		if (!this.session) return;
+		const session = this.requireSession(params.sessionId);
+		const requestedModelId = String(params.modelId);
+		const currentModel = session.model;
+		if (currentModel && toAcpModelId(currentModel) === requestedModelId) {
+			return {};
+		}
 
-		const targetModel = await this.resolveModel(params.modelId);
-		await this.session.setModel(targetModel);
-
+		const model = await this.resolveModel(requestedModelId, session);
+		await session.setModel(model);
+		await this.emitModeAndConfigUpdates(session);
 		return {};
+	}
+
+	async setSessionConfigOption(
+		params: SetSessionConfigOptionRequest,
+	): Promise<SetSessionConfigOptionResponse> {
+		const session = this.requireSession(params.sessionId);
+
+		if (params.configId === MODEL_CONFIG_ID) {
+			const model = this.requireSelectValue(params, MODEL_CONFIG_ID);
+			return this.setModelConfigOption(session, model);
+		}
+
+		if (params.configId === THOUGHT_LEVEL_CONFIG_ID) {
+			const thinkingLevel = this.requireSelectValue(
+				params,
+				THOUGHT_LEVEL_CONFIG_ID,
+			);
+			const availableLevels = session.getAvailableThinkingLevels();
+			const matchedLevel = availableLevels.find(
+				(level) => level === thinkingLevel,
+			);
+			if (!matchedLevel) {
+				throw RequestError.invalidParams(
+					{
+						configId: params.configId,
+						value: thinkingLevel,
+						availableValues: availableLevels,
+					},
+					`Unsupported thinking level "${thinkingLevel}"`,
+				);
+			}
+
+			session.setThinkingLevel(matchedLevel);
+			const configOptions = await this.buildConfigOptions(session);
+			await this.emitModeAndConfigUpdates(session, configOptions);
+			return { configOptions };
+		}
+
+		throw RequestError.invalidParams(
+			{ configId: params.configId },
+			`Unsupported config option "${params.configId}"`,
+		);
 	}
 
 	async authenticate(
@@ -222,11 +276,13 @@ class PiSdkAgent implements Agent {
 		// Auth handled via env vars (ANTHROPIC_API_KEY)
 	}
 
-	private async buildModelState(): Promise<SessionModelState | undefined> {
-		if (!this.session?.model) return undefined;
+	private async buildModelState(
+		session: AgentSession,
+	): Promise<SessionModelState | undefined> {
+		if (!session.model) return undefined;
 
-		const currentModel = this.session.model;
-		const availableModels = await this.session.modelRegistry.getAvailable();
+		const currentModel = session.model;
+		const availableModels = await session.modelRegistry.getAvailable();
 		const modelInfos = new Map<string, ModelInfo>();
 
 		for (const model of [currentModel, ...availableModels]) {
@@ -239,8 +295,12 @@ class PiSdkAgent implements Agent {
 		};
 	}
 
-	private async resolveModel(modelId: string): Promise<Model<Api>> {
-		if (!this.session) {
+	private async resolveModel(
+		modelId: string,
+		session?: AgentSession | null,
+	): Promise<Model<Api>> {
+		const resolvedSession = session ?? this.session;
+		if (!resolvedSession) {
 			throw RequestError.invalidRequest(undefined, "No session created");
 		}
 
@@ -248,7 +308,10 @@ class PiSdkAgent implements Agent {
 		if (slashIndex !== -1) {
 			const provider = modelId.slice(0, slashIndex);
 			const providerModelId = modelId.slice(slashIndex + 1);
-			const match = this.session.modelRegistry.find(provider, providerModelId);
+			const match = resolvedSession.modelRegistry.find(
+				provider,
+				providerModelId,
+			);
 			if (!match) {
 				throw RequestError.invalidParams(
 					{ modelId },
@@ -256,7 +319,7 @@ class PiSdkAgent implements Agent {
 				);
 			}
 
-			const apiKey = await this.session.modelRegistry.getApiKey(match);
+			const apiKey = await resolvedSession.modelRegistry.getApiKey(match);
 			if (!apiKey) {
 				throw RequestError.invalidParams(
 					{ modelId },
@@ -267,7 +330,7 @@ class PiSdkAgent implements Agent {
 			return match;
 		}
 
-		const availableModels = await this.session.modelRegistry.getAvailable();
+		const availableModels = await resolvedSession.modelRegistry.getAvailable();
 		const matches = availableModels.filter((model) => model.id === modelId);
 		if (matches.length === 0) {
 			throw RequestError.invalidParams(
@@ -286,6 +349,130 @@ class PiSdkAgent implements Agent {
 	}
 
 	// ── Event translation ───────────────────────────────────────────
+
+	private requireSession(sessionId: string): AgentSession {
+		const session = this.session;
+		if (!session) {
+			throw RequestError.invalidRequest(
+				{ sessionId },
+				"No active session",
+			);
+		}
+		if (sessionId !== this.sessionId) {
+			throw RequestError.invalidParams(
+				{ sessionId },
+				`Unknown session "${sessionId}"`,
+			);
+		}
+		return session;
+	}
+
+	private requireSelectValue(
+		params: SetSessionConfigOptionRequest,
+		configId: string,
+	): string {
+		if ("type" in params && params.type === "boolean") {
+			throw RequestError.invalidParams(
+				{ configId, value: params.value },
+				`Config option "${configId}" expects a select value`,
+			);
+		}
+		return String(params.value);
+	}
+
+	private async setModelConfigOption(
+		session: AgentSession,
+		requestedModelId: string,
+	): Promise<SetSessionConfigOptionResponse> {
+		const currentModel = session.model;
+		if (currentModel && toAcpModelId(currentModel) === requestedModelId) {
+			return {
+				configOptions: await this.buildConfigOptions(session),
+			};
+		}
+
+		const model = await this.resolveModel(requestedModelId, session);
+		await session.setModel(model);
+		const configOptions = await this.buildConfigOptions(session);
+		await this.emitModeAndConfigUpdates(session, configOptions);
+		return { configOptions };
+	}
+
+	private async emitModeAndConfigUpdates(
+		session: AgentSession,
+		configOptions?: SessionConfigOption[],
+	): Promise<void> {
+		const resolvedConfigOptions =
+			configOptions ?? (await this.buildConfigOptions(session));
+		const modes = this.buildModeState(session);
+		await this.emit({
+			sessionUpdate: "current_mode_update",
+			currentModeId: modes.currentModeId,
+		});
+		await this.emit({
+			sessionUpdate: "config_option_update",
+			configOptions: resolvedConfigOptions,
+		});
+	}
+
+	private buildModeState(
+		session: AgentSession,
+	): NonNullable<NewSessionResponse["modes"]> {
+		const availableModes = session.getAvailableThinkingLevels();
+		const currentModeId =
+			availableModes.find((modeId) => modeId === session.thinkingLevel) ??
+			availableModes[0] ??
+			"off";
+		return {
+			currentModeId,
+			availableModes: availableModes.map((modeId) => ({
+				id: modeId,
+				name: `Thinking: ${modeId}`,
+			})),
+		};
+	}
+
+	private async buildConfigOptions(
+		session: AgentSession,
+		modelState?: SessionModelState,
+	): Promise<SessionConfigOption[]> {
+		const configOptions: SessionConfigOption[] = [];
+		const resolvedModelState =
+			modelState ?? (await this.buildModelState(session));
+		if (resolvedModelState) {
+			configOptions.push({
+				type: "select",
+				id: MODEL_CONFIG_ID,
+				name: "Model",
+				category: "model",
+				currentValue: resolvedModelState.currentModelId,
+				options: resolvedModelState.availableModels.map((model) => ({
+					value: model.modelId,
+					name: model.name,
+					description: model.description,
+				})),
+			});
+		}
+
+		const availableLevels = session.getAvailableThinkingLevels();
+		const currentThinkingLevel =
+			availableLevels.find((level) => level === session.thinkingLevel) ??
+			availableLevels[0] ??
+			"off";
+		configOptions.push({
+			type: "select",
+			id: THOUGHT_LEVEL_CONFIG_ID,
+			name: "Thinking Level",
+			category: "thought_level",
+			currentValue: currentThinkingLevel,
+			options: availableLevels.map((level) => ({
+				value: level,
+				name: level,
+			})),
+		});
+
+		return configOptions;
+	}
 
 	private emit(update: SessionNotification["update"]): Promise<void> {
 		this.lastEmit = this.lastEmit
