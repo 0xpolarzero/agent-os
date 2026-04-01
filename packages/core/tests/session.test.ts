@@ -213,6 +213,51 @@ describe("full createSession API", () => {
 		}
 	}, 90_000);
 
+	test("createSession('pi') exposes model state and setSessionModel works end-to-end", async () => {
+		let sessionId: string | undefined;
+
+		try {
+			const session = await vm.createSession("pi", {
+				env: {
+					ANTHROPIC_API_KEY: "mock-key",
+					ANTHROPIC_BASE_URL: mockUrl,
+				},
+			});
+			sessionId = session.sessionId;
+
+			const modelState = vm.getSessionModelState(sessionId);
+			expect(modelState).not.toBeNull();
+			expect(modelState?.currentModelId).toBeTruthy();
+			expect(modelState?.availableModels.length).toBeGreaterThan(0);
+
+			const targetModel =
+				modelState?.availableModels.find(
+					(model) => model.modelId !== modelState.currentModelId,
+				) ?? modelState?.availableModels[0];
+			expect(targetModel).toBeDefined();
+
+			const setModelResponse = await vm.setSessionModel(
+				sessionId,
+				targetModel!.modelId,
+			);
+			expect(setModelResponse.error).toBeUndefined();
+			expect(setModelResponse.result).toEqual({});
+
+			const promptResponse = await vm.prompt(
+				sessionId,
+				"Reply with exactly the word hello.",
+			);
+			expect(promptResponse.error).toBeUndefined();
+			expect(
+				(promptResponse.result as { stopReason?: string }).stopReason,
+			).toBe("end_turn");
+		} finally {
+			if (sessionId) {
+				vm.closeSession(sessionId);
+			}
+		}
+	}, 90_000);
+
 	test("session.prompt() sends prompt and receives session/update events", async () => {
 		const { sessionId } = await createMockSession(vm);
 

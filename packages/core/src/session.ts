@@ -33,6 +33,19 @@ export interface SessionModeState {
 	availableModes: SessionMode[];
 }
 
+/** A model the agent supports for a session. */
+export interface SessionModel {
+	modelId: string;
+	name: string;
+	description?: string;
+}
+
+/** Current model state reported by the agent. */
+export interface SessionModelState {
+	currentModelId: string;
+	availableModels: SessionModel[];
+}
+
 /** A configuration option the agent supports. */
 export interface SessionConfigOption {
 	id: string;
@@ -69,6 +82,7 @@ export interface AgentInfo {
 /** Options for constructing a Session, including capabilities from initialize/session-new. */
 export interface SessionInitData {
 	modes?: SessionModeState;
+	models?: SessionModelState;
 	configOptions?: SessionConfigOption[];
 	capabilities?: AgentCapabilities;
 	agentInfo?: AgentInfo;
@@ -95,6 +109,7 @@ export class Session {
 	private _eventHandlers: SessionEventHandler[] = [];
 	private _permissionHandlers: PermissionRequestHandler[] = [];
 	private _modes: SessionModeState | null;
+	private _models: SessionModelState | null;
 	private _configOptions: SessionConfigOption[];
 	private _capabilities: AgentCapabilities;
 	private _agentInfo: AgentInfo | null;
@@ -115,6 +130,7 @@ export class Session {
 		this._agentType = agentType;
 		this._onClose = onClose;
 		this._modes = initData?.modes ?? null;
+		this._models = initData?.models ?? null;
 		this._configOptions = initData?.configOptions ?? [];
 		this._capabilities = initData?.capabilities ?? {};
 		this._agentInfo = initData?.agentInfo ?? null;
@@ -252,10 +268,19 @@ export class Session {
 
 	/**
 	 * Set the model for this session.
-	 * Finds the config option with category "model" and sends session/set_config_option.
+	 * Sends session/set_model via ACP.
 	 */
 	async setModel(model: string): Promise<JsonRpcResponse> {
-		return this._setConfigByCategory("model", model);
+		this._throwIfClosed();
+		return this._client.request("session/set_model", {
+			sessionId: this._sessionId,
+			modelId: model,
+		});
+	}
+
+	/** Returns the current model state reported by the agent. */
+	getModelState(): SessionModelState | null {
+		return this._models;
 	}
 
 	/**

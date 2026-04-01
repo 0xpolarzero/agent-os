@@ -14,7 +14,7 @@
 import {
 	type Agent,
 	AgentSideConnection,
-	type RequestError,
+	RequestError,
 	ndJsonStream,
 } from "@agentclientprotocol/sdk";
 import type {
@@ -23,13 +23,17 @@ import type {
 	CancelNotification,
 	InitializeRequest,
 	InitializeResponse,
+	ModelInfo,
 	NewSessionRequest,
 	NewSessionResponse,
 	PromptRequest,
 	PromptResponse,
+	SetSessionModelRequest,
+	SetSessionModelResponse,
 	SetSessionModeRequest,
 	SetSessionModeResponse,
 	SessionNotification,
+	SessionModelState,
 } from "@agentclientprotocol/sdk";
 import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
 import {
@@ -37,6 +41,7 @@ import {
 	createAgentSession,
 } from "@mariozechner/pi-coding-agent";
 import type { AgentSession } from "@mariozechner/pi-coding-agent";
+import type { Api, Model } from "@mariozechner/pi-ai";
 import { isAbsolute, resolve as resolvePath } from "node:path";
 import { readFileSync } from "node:fs";
 
@@ -49,6 +54,18 @@ for (let i = 0; i < argv.length; i++) {
 		appendSystemPrompt = argv[i + 1];
 		i++;
 	}
+}
+
+function toAcpModelId(model: Model<Api>): string {
+	return `${model.provider}/${model.id}`;
+}
+
+function toModelInfo(model: Model<Api>): ModelInfo {
+	return {
+		modelId: toAcpModelId(model),
+		name: model.name,
+		description: `Provider: ${model.provider}`,
+	};
 }
 
 // ── Agent implementation ────────────────────────────────────────────
@@ -125,10 +142,12 @@ class PiSdkAgent implements Agent {
 				name: `Thinking: ${id}`,
 			})),
 		};
+		const models = await this.buildModelState();
 
 		return {
 			sessionId: this.sessionId,
 			modes,
+			...(models ? { models } : {}),
 		};
 	}
 
@@ -186,10 +205,84 @@ class PiSdkAgent implements Agent {
 		});
 	}
 
+	async unstable_setSessionModel(
+		params: SetSessionModelRequest,
+	): Promise<SetSessionModelResponse | void> {
+		if (!this.session) return;
+
+		const targetModel = await this.resolveModel(params.modelId);
+		await this.session.setModel(targetModel);
+
+		return {};
+	}
+
 	async authenticate(
 		_params: AuthenticateRequest,
 	): Promise<AuthenticateResponse | void> {
 		// Auth handled via env vars (ANTHROPIC_API_KEY)
+	}
+
+	private async buildModelState(): Promise<SessionModelState | undefined> {
+		if (!this.session?.model) return undefined;
+
+		const currentModel = this.session.model;
+		const availableModels = await this.session.modelRegistry.getAvailable();
+		const modelInfos = new Map<string, ModelInfo>();
+
+		for (const model of [currentModel, ...availableModels]) {
+			modelInfos.set(toAcpModelId(model), toModelInfo(model));
+		}
+
+		return {
+			currentModelId: toAcpModelId(currentModel),
+			availableModels: Array.from(modelInfos.values()),
+		};
+	}
+
+	private async resolveModel(modelId: string): Promise<Model<Api>> {
+		if (!this.session) {
+			throw RequestError.invalidRequest(undefined, "No session created");
+		}
+
+		const slashIndex = modelId.indexOf("/");
+		if (slashIndex !== -1) {
+			const provider = modelId.slice(0, slashIndex);
+			const providerModelId = modelId.slice(slashIndex + 1);
+			const match = this.session.modelRegistry.find(provider, providerModelId);
+			if (!match) {
+				throw RequestError.invalidParams(
+					{ modelId },
+					`Unknown model: ${modelId}`,
+				);
+			}
+
+			const apiKey = await this.session.modelRegistry.getApiKey(match);
+			if (!apiKey) {
+				throw RequestError.invalidParams(
+					{ modelId },
+					`Model is unavailable without credentials: ${modelId}`,
+				);
+			}
+
+			return match;
+		}
+
+		const availableModels = await this.session.modelRegistry.getAvailable();
+		const matches = availableModels.filter((model) => model.id === modelId);
+		if (matches.length === 0) {
+			throw RequestError.invalidParams(
+				{ modelId },
+				`Unknown model: ${modelId}`,
+			);
+		}
+		if (matches.length > 1) {
+			throw RequestError.invalidParams(
+				{ modelId },
+				`Ambiguous model ID "${modelId}". Use "provider/modelId" instead.`,
+			);
+		}
+
+		return matches[0];
 	}
 
 	// ── Event translation ───────────────────────────────────────────
