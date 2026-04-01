@@ -12,10 +12,14 @@ const appOutputPath = resolve(playgroundDir, "dist/app.js");
 
 const BRIDGE_IMPORT_BLOCK = `\tlet bridgeModule: Record<string, unknown>;
 \ttry {
-\t\tbridgeModule = await dynamicImportModule("../bridge/index.js");
+\t\tbridgeModule = await dynamicImportModule("@secure-exec/nodejs/internal/bridge");
 \t} catch {
-\t\t// Vite browser tests execute source files directly, so \`.ts\` fallback is required.
-\t\tbridgeModule = await dynamicImportModule("../bridge/index.ts");
+\t\t// Vite browser tests may need a second attempt during source execution.
+\t\ttry {
+\t\t\tbridgeModule = await dynamicImportModule("@secure-exec/nodejs/internal/bridge");
+\t\t} catch {
+\t\t\tthrow new Error("Failed to load bridge module from @secure-exec/nodejs");
+\t\t}
 \t}`;
 
 async function writeGeneratedBundle(outputPath: string, sourcePath: string): Promise<void> {
@@ -28,13 +32,23 @@ async function buildWorkerBundle(): Promise<void> {
 	const patchedSource = originalSource
 		.replace(
 			'import { mkdir } from "../fs-helpers.js";',
-			'import { mkdir } from "../fs-helpers.js";\nimport * as browserWorkerBridgeModule from "../bridge/index.ts";',
+			'import { mkdir } from "../fs-helpers.js";\nimport * as browserWorkerBridgeModule from "@secure-exec/nodejs/internal/bridge";',
 		)
 		.replace(BRIDGE_IMPORT_BLOCK, "\tconst bridgeModule = browserWorkerBridgeModule;");
 
 	await build({
 		bundle: true,
-		external: ["path", "fs", "module", "util"],
+		external: [
+			"fs",
+			"module",
+			"path",
+			"util",
+			"node:fs",
+			"node:fs/promises",
+			"node:module",
+			"node:path",
+			"node:util",
+		],
 		format: "esm",
 		legalComments: "none",
 		minify: true,

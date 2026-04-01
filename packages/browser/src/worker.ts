@@ -1,34 +1,39 @@
 import { transform } from "sucrase";
 import {
-	getRequireSetupCode,
 	createCommandExecutorStub,
 	createFsStub,
 	createNetworkStub,
 	filterEnv,
 	wrapFileSystem,
 	wrapNetworkAdapter,
-	createInMemoryFileSystem,
+} from "@secure-exec/core/internal/shared/permissions";
+import { createInMemoryFileSystem } from "@secure-exec/core/internal/shared/in-memory-fs";
+import {
 	isESM,
 	transformDynamicImport,
-	getIsolateRuntimeSource,
-	POLYFILL_CODE_MAP,
-	loadFile,
-	resolveModule,
-	mkdir,
+} from "@secure-exec/core/internal/shared/esm-utils";
+import { getRequireSetupCode } from "@secure-exec/core/internal/shared/require-setup";
+import {
 	exposeCustomGlobal,
 	exposeMutableRuntimeStateGlobal,
-} from "@secure-exec/core";
+} from "@secure-exec/core/internal/shared/global-exposure";
+import { getIsolateRuntimeSource } from "@secure-exec/core/internal/generated/isolate-runtime";
+import { POLYFILL_CODE_MAP } from "@secure-exec/core/internal/generated/polyfills";
+import { loadFile, resolveModule } from "@secure-exec/core/internal/package-bundler";
+import { mkdir } from "@secure-exec/core/internal/fs-helpers";
 import type {
 	Permissions,
 	VirtualFileSystem,
-} from "@secure-exec/core";
+} from "@secure-exec/core/internal/kernel";
 import type {
 	CommandExecutor,
 	NetworkAdapter,
+} from "@secure-exec/core/internal/types";
+import type {
 	ExecResult,
 	RunResult,
 	StdioChannel,
-} from "@secure-exec/core";
+} from "@secure-exec/core/internal/shared/api-types";
 import {
 	createBrowserNetworkAdapter,
 	createOpfsFileSystem,
@@ -526,13 +531,13 @@ async function initRuntime(payload: BrowserWorkerInitPayload): Promise<void> {
 	}
 	let bridgeModule: Record<string, unknown>;
 	try {
-		bridgeModule = await dynamicImportModule("@secure-exec/core/internal/bridge");
+		bridgeModule = await dynamicImportModule("@secure-exec/nodejs/internal/bridge");
 	} catch {
-		// Vite browser tests may need source fallback.
+		// Vite browser tests may need a second attempt during source execution.
 		try {
-			bridgeModule = await dynamicImportModule("@secure-exec/core/internal/bridge");
+			bridgeModule = await dynamicImportModule("@secure-exec/nodejs/internal/bridge");
 		} catch {
-			throw new Error("Failed to load bridge module from @secure-exec/core");
+			throw new Error("Failed to load bridge module from @secure-exec/nodejs");
 		}
 	}
 	exposeCustomGlobal("_fsModule", bridgeModule.default);

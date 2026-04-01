@@ -4,17 +4,19 @@ import {
 	createNetworkStub,
 	wrapFileSystem,
 	wrapNetworkAdapter,
-	createInMemoryFileSystem,
-	createEnosysError,
-} from "@secure-exec/core";
+} from "@secure-exec/core/internal/shared/permissions";
+import { createInMemoryFileSystem } from "@secure-exec/core/internal/shared/in-memory-fs";
+import { createEnosysError } from "@secure-exec/core/internal/shared/errors";
 import type {
 	Permissions,
 	VirtualFileSystem,
-} from "@secure-exec/core";
+} from "@secure-exec/core/internal/kernel";
 import type {
 	NetworkAdapter,
+} from "@secure-exec/core/internal/types";
+import type {
 	SystemDriver,
-} from "@secure-exec/core";
+} from "@secure-exec/core/internal/runtime-driver";
 
 const S_IFREG = 0o100000;
 const S_IFDIR = 0o040000;
