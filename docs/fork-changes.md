@@ -2,15 +2,21 @@
 
 This file tracks fork-only work in `0xpolarzero/agent-os` so we have a local record of additions that are not yet part of upstream `rivet-dev/agent-os`.
 
-Last updated: 2026-04-01.
+Last updated: 2026-04-02.
 
 ## Current Status
 
-As of 2026-04-01:
+As of 2026-04-02:
 
-- There are no open PRs on `0xpolarzero/agent-os`.
+- There is 1 open PR on `0xpolarzero/agent-os`: [#9 fix: use project references for CI type checks](https://github.com/0xpolarzero/agent-os/pull/9).
 - There are no open PRs from `0xpolarzero/*` into `rivet-dev/agent-os`.
-- The fork-only delta currently lives on `0xpolarzero/agent-os:main` through the merged PRs below.
+- The fork-only delta currently lives on `0xpolarzero/agent-os:main` through the merged PRs below, plus the in-flight changes tracked in the open fork PR below.
+
+## Open Fork PRs
+
+| PR | Status | Overview |
+| --- | --- | --- |
+| [#9 fix: use project references for CI type checks](https://github.com/0xpolarzero/agent-os/pull/9) | Open as of 2026-04-02 | Replaces the temporary `types -> src` clean-runner workaround with targeted TypeScript project references across the quickstart and package-snapshot dependency graph, restores published package manifests to `dist` declaration paths, normalizes touched workspace dependencies to `workspace:*`, and hardens both `CI` and `Package Snapshots` on a fresh GitHub Actions runner. |
 
 ## Merged Fork PRs
 
@@ -27,6 +33,7 @@ As of 2026-04-01:
 - Core session state is being expanded to expose model metadata and explicit model mutation APIs.
 - The PI adapter is being brought up to parity so model and config discovery or mutation work end to end.
 - Snapshot publishing now runs from GitHub Actions on PRs, push to `main`, and manual dispatch, defaulting to the full non-private workspace selection while skipping packages that still lack required publish artifacts or required workspace dependencies.
+- Clean-runner type-checking is being moved off manifest hacks and onto targeted TypeScript project references so declaration resolution stays correct in CI and published packages continue to point at built `dist` outputs.
 
 ## Maintenance Notes
 
