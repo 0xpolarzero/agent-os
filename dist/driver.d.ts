@@ -1,0 +1,32 @@
+import type { ExecOptions, ExecResult, PythonRunOptions, PythonRunResult, PythonRuntimeDriver, PythonRuntimeDriverFactory, RuntimeDriverOptions } from "@secure-exec/core";
+export declare class PyodideRuntimeDriver implements PythonRuntimeDriver {
+    private readonly options;
+    private worker;
+    private readonly pending;
+    private readonly defaultOnStdio?;
+    private readonly filesystem;
+    private readonly networkAdapter;
+    private readonly defaultCpuTimeLimitMs?;
+    private readonly runtimeEnv;
+    private readonly indexPath;
+    private nextRequestId;
+    private readyPromise;
+    private disposed;
+    constructor(options: RuntimeDriverOptions);
+    private ensureNotDisposed;
+    private handleWorkerMessage;
+    private handleWorkerError;
+    private handleWorkerExit;
+    private handleWorkerRpc;
+    private rejectAllPending;
+    private createWorker;
+    private ensureWorkerReady;
+    private restartWorkerAfterTimeout;
+    private callWorker;
+    private runWithTimeout;
+    run<T = unknown>(code: string, options?: PythonRunOptions): Promise<PythonRunResult<T>>;
+    exec(code: string, options?: ExecOptions): Promise<ExecResult>;
+    dispose(): void;
+    terminate(): Promise<void>;
+}
+export declare function createPyodideRuntimeDriverFactory(): PythonRuntimeDriverFactory;
