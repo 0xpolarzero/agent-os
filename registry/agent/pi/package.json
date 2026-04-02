@@ -4,20 +4,20 @@
 	"type": "module",
 	"license": "Apache-2.0",
 	"main": "./dist/index.js",
-	"types": "./src/index.ts",
+	"types": "./dist/index.d.ts",
 	"bin": {
 		"pi-sdk-acp": "./dist/adapter.js"
 	},
 	"exports": {
 		".": {
-			"types": "./src/index.ts",
+			"types": "./dist/index.d.ts",
 			"import": "./dist/index.js",
 			"default": "./dist/index.js"
 		}
 	},
 	"scripts": {
-		"build": "tsc",
-		"check-types": "tsc --noEmit"
+		"build": "tsc -b",
+		"check-types": "tsc -b"
 	},
 	"dependencies": {
 		"@rivet-dev/agent-os-core": "workspace:*",

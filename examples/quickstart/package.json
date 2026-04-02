@@ -4,8 +4,8 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"check-types": "tsc --noEmit",
-		"build": "tsc",
+		"check-types": "tsc -b",
+		"build": "tsc -b",
 		"hello-world": "node --import tsx src/hello-world.ts",
 		"git": "node --import tsx src/git.ts",
 		"filesystem": "node --import tsx src/filesystem.ts",
@@ -22,12 +22,12 @@
 	},
 	"dependencies": {
 		"@rivet-dev/agent-os-core": "workspace:*",
-		"@rivet-dev/agent-os-sandbox": "link:../../registry/tool/sandbox",
+		"@rivet-dev/agent-os-sandbox": "workspace:*",
 		"sandbox-agent": "^0.4.2",
-		"@rivet-dev/agent-os-common": "link:../../registry/software/common",
-		"@rivet-dev/agent-os-git": "link:../../registry/software/git",
-		"@rivet-dev/agent-os-pi": "link:../../registry/agent/pi",
-		"@rivet-dev/agent-os-s3": "link:../../registry/file-system/s3",
+		"@rivet-dev/agent-os-common": "workspace:*",
+		"@rivet-dev/agent-os-git": "workspace:*",
+		"@rivet-dev/agent-os-pi": "workspace:*",
+		"@rivet-dev/agent-os-s3": "workspace:*",
 		"pyodide": "^0.28.3",
 		"zod": "^3.25.0"
 	},
