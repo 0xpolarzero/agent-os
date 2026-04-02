@@ -1,0 +1,19 @@
+{
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"composite": true,
+		"esModuleInterop": true,
+		"declaration": true,
+		"outDir": "./dist",
+		"rootDir": "./src"
+	},
+	"references": [
+		{ "path": "../python" },
+		{ "path": "../posix" },
+		{ "path": "../../registry/software/coreutils" }
+	],
+	"include": ["src/**/*"],
+	"exclude": ["node_modules", "dist"]
+}

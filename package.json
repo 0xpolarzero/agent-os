@@ -1,0 +1,74 @@
+{
+	"name": "@rivet-dev/agent-os-core",
+	"version": "0.1.0",
+	"type": "module",
+	"license": "Apache-2.0",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist",
+		"fixtures"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"default": "./dist/index.js"
+		},
+		"./test/file-system": {
+			"types": "./dist/test/file-system.d.ts",
+			"import": "./dist/test/file-system.js",
+			"default": "./dist/test/file-system.js"
+		},
+		"./test/docker": {
+			"types": "./dist/test/docker.d.ts",
+			"import": "./dist/test/docker.js",
+			"default": "./dist/test/docker.js"
+		}
+	},
+	"scripts": {
+		"check-types": "tsc -b",
+		"build": "tsc -b",
+		"test": "vitest run"
+	},
+	"dependencies": {
+		"@secure-exec/core": "^0.2.1",
+		"@secure-exec/nodejs": "^0.2.1",
+		"@rivet-dev/agent-os-python": "https://codeload.github.com/0xpolarzero/agent-os/tar.gz/refs/tags/snapshot-agent-os-python-main-7e4b9b6129b2.1",
+		"@secure-exec/v8": "^0.2.1",
+		"@rivet-dev/agent-os-posix": "https://codeload.github.com/0xpolarzero/agent-os/tar.gz/refs/tags/snapshot-agent-os-posix-main-7e4b9b6129b2.1",
+		"croner": "^10.0.1",
+		"long-timeout": "^0.1.1",
+		"secure-exec": "^0.2.1"
+	},
+	"devDependencies": {
+		"@anthropic-ai/claude-code": "^2.1.86",
+		"@copilotkit/llmock": "^1.6.0",
+		"@mariozechner/pi-coding-agent": "^0.60.0",
+		"@rivet-dev/agent-os-pi": "https://codeload.github.com/0xpolarzero/agent-os/tar.gz/refs/tags/snapshot-agent-os-pi-main-7e4b9b6129b2.1",
+		"@rivet-dev/agent-os-pi-cli": "https://codeload.github.com/0xpolarzero/agent-os/tar.gz/refs/tags/snapshot-agent-os-pi-cli-main-7e4b9b6129b2.1",
+		"@rivet-dev/agent-os-codex": "https://codeload.github.com/0xpolarzero/agent-os/tar.gz/refs/tags/snapshot-agent-os-codex-main-7e4b9b6129b2.1",
+		"@rivet-dev/agent-os-coreutils": "https://codeload.github.com/0xpolarzero/agent-os/tar.gz/refs/tags/snapshot-agent-os-coreutils-main-7e4b9b6129b2.1",
+		"@rivet-dev/agent-os-curl": "0.0.260331072558",
+		"@rivet-dev/agent-os-diffutils": "https://codeload.github.com/0xpolarzero/agent-os/tar.gz/refs/tags/snapshot-agent-os-diffutils-main-7e4b9b6129b2.1",
+		"@rivet-dev/agent-os-fd": "https://codeload.github.com/0xpolarzero/agent-os/tar.gz/refs/tags/snapshot-agent-os-fd-main-7e4b9b6129b2.1",
+		"@rivet-dev/agent-os-file": "https://codeload.github.com/0xpolarzero/agent-os/tar.gz/refs/tags/snapshot-agent-os-file-main-7e4b9b6129b2.1",
+		"@rivet-dev/agent-os-findutils": "https://codeload.github.com/0xpolarzero/agent-os/tar.gz/refs/tags/snapshot-agent-os-findutils-main-7e4b9b6129b2.1",
+		"@rivet-dev/agent-os-gawk": "https://codeload.github.com/0xpolarzero/agent-os/tar.gz/refs/tags/snapshot-agent-os-gawk-main-7e4b9b6129b2.1",
+		"@rivet-dev/agent-os-grep": "https://codeload.github.com/0xpolarzero/agent-os/tar.gz/refs/tags/snapshot-agent-os-grep-main-7e4b9b6129b2.1",
+		"@rivet-dev/agent-os-gzip": "https://codeload.github.com/0xpolarzero/agent-os/tar.gz/refs/tags/snapshot-agent-os-gzip-main-7e4b9b6129b2.1",
+		"@rivet-dev/agent-os-jq": "https://codeload.github.com/0xpolarzero/agent-os/tar.gz/refs/tags/snapshot-agent-os-jq-main-7e4b9b6129b2.1",
+		"@rivet-dev/agent-os-ripgrep": "https://codeload.github.com/0xpolarzero/agent-os/tar.gz/refs/tags/snapshot-agent-os-ripgrep-main-7e4b9b6129b2.1",
+		"@rivet-dev/agent-os-sed": "https://codeload.github.com/0xpolarzero/agent-os/tar.gz/refs/tags/snapshot-agent-os-sed-main-7e4b9b6129b2.1",
+		"@rivet-dev/agent-os-tar": "https://codeload.github.com/0xpolarzero/agent-os/tar.gz/refs/tags/snapshot-agent-os-tar-main-7e4b9b6129b2.1",
+		"@rivet-dev/agent-os-tree": "https://codeload.github.com/0xpolarzero/agent-os/tar.gz/refs/tags/snapshot-agent-os-tree-main-7e4b9b6129b2.1",
+		"@rivet-dev/agent-os-yq": "https://codeload.github.com/0xpolarzero/agent-os/tar.gz/refs/tags/snapshot-agent-os-yq-main-7e4b9b6129b2.1",
+		"@types/node": "^22.10.2",
+		"opencode-ai": "^1.3.3",
+		"pi-acp": "^0.0.23",
+		"sandbox-agent": "^0.4.2",
+		"typescript": "^5.7.2",
+		"vitest": "^2.1.8",
+		"zod": "^3.25.0"
+	}
+}
