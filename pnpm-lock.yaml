@@ -470,7 +470,7 @@ importers:
   registry/software/codex:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -531,7 +531,7 @@ importers:
   registry/software/curl:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -555,7 +555,7 @@ importers:
   registry/software/fd:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -567,7 +567,7 @@ importers:
   registry/software/file:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -639,7 +639,7 @@ importers:
   registry/software/jq:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -651,7 +651,7 @@ importers:
   registry/software/make:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -663,7 +663,7 @@ importers:
   registry/software/ripgrep:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -687,7 +687,7 @@ importers:
   registry/software/sqlite3:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -711,7 +711,7 @@ importers:
   registry/software/tree:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -723,7 +723,7 @@ importers:
   registry/software/unzip:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -735,7 +735,7 @@ importers:
   registry/software/wget:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -747,7 +747,7 @@ importers:
   registry/software/yq:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
@@ -759,7 +759,7 @@ importers:
   registry/software/zip:
     devDependencies:
       '@rivet-dev/agent-os-registry-types':
-        specifier: link:../../../packages/registry-types
+        specifier: workspace:*
         version: link:../../../packages/registry-types
       '@types/node':
         specifier: ^22.10.2
