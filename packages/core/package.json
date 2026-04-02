@@ -27,8 +27,8 @@
 		}
 	},
 	"scripts": {
-		"check-types": "tsc --noEmit",
-		"build": "tsc",
+		"check-types": "tsc -b",
+		"build": "tsc -b",
 		"test": "vitest run"
 	},
 	"dependencies": {
@@ -48,7 +48,7 @@
 		"@rivet-dev/agent-os-pi": "link:../../registry/agent/pi",
 		"@rivet-dev/agent-os-pi-cli": "link:../../registry/agent/pi-cli",
 		"@rivet-dev/agent-os-codex": "link:../../registry/software/codex",
-		"@rivet-dev/agent-os-coreutils": "link:../../registry/software/coreutils",
+		"@rivet-dev/agent-os-coreutils": "workspace:*",
 		"@rivet-dev/agent-os-curl": "link:../../registry/software/curl",
 		"@rivet-dev/agent-os-diffutils": "link:../../registry/software/diffutils",
 		"@rivet-dev/agent-os-fd": "link:../../registry/software/fd",

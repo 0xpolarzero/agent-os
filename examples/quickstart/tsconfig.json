@@ -3,11 +3,20 @@
 	"compilerOptions": {
 		"module": "NodeNext",
 		"moduleResolution": "NodeNext",
+		"composite": true,
 		"esModuleInterop": true,
 		"outDir": "./dist",
 		"rootDir": "./src",
 		"noEmit": true
 	},
+	"references": [
+		{ "path": "../../packages/core" },
+		{ "path": "../../registry/software/common" },
+		{ "path": "../../registry/software/git" },
+		{ "path": "../../registry/agent/pi" },
+		{ "path": "../../registry/file-system/s3" },
+		{ "path": "../../registry/tool/sandbox" }
+	],
 	"include": ["src/**/*"],
 	"exclude": ["node_modules", "dist"]
 }

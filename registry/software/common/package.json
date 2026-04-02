@@ -16,8 +16,8 @@
     }
   },
   "scripts": {
-    "build": "tsc",
-    "check-types": "tsc --noEmit"
+    "build": "tsc -b",
+    "check-types": "tsc -b"
   },
   "dependencies": {
     "@rivet-dev/agent-os-coreutils": "workspace:*",

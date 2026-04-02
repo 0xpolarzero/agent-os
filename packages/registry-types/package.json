@@ -13,8 +13,8 @@
 		}
 	},
 	"scripts": {
-		"build": "tsc",
-		"check-types": "tsc --noEmit"
+		"build": "tsc -b",
+		"check-types": "tsc -b --noEmit"
 	},
 	"devDependencies": {
 		"@types/node": "^22.10.2",

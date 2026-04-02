@@ -27,8 +27,8 @@
     }
   },
   "scripts": {
-    "check-types": "tsc --noEmit",
-    "build": "tsc",
+    "check-types": "tsc -b --noEmit",
+    "build": "tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
